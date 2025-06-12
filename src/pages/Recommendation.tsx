@@ -4,7 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Search, MapPin, Users, TrendingUp, Building2, Star } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Search, MapPin, Users, TrendingUp, Building2, Star, BarChart3, Zap, Shield } from 'lucide-react';
 import { mockIndustrialComplexes, mockCompanies } from '@/data/mockData';
 import Layout from '@/components/Layout';
 
@@ -13,22 +15,44 @@ const Recommendation = () => {
   const [searchType, setSearchType] = useState<'company' | 'industry' | 'ksic'>('company');
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [isSearched, setIsSearched] = useState(false);
+  const [policyScenario, setPolicyScenario] = useState('current');
 
   const handleSearch = () => {
     // 더미 추천 로직 - 실제로는 AI 모델 결과
     const scored = mockIndustrialComplexes.map(complex => ({
       ...complex,
       suitabilityScore: Math.random() * 10,
+      policyImpact: policyScenario !== 'current' ? (Math.random() * 2 - 1) : 0,
       reasons: [
         '유사 업종 기업 집적도 높음',
         '교통 접근성 우수',
         '고용 안정성 양호',
-        '정부 지원 정책 혜택'
-      ].slice(0, Math.floor(Math.random() * 3) + 2)
-    })).sort((a, b) => b.suitabilityScore - a.suitabilityScore);
+        '정부 지원 정책 혜택',
+        '인력 공급 원활',
+        '물류 네트워크 발달'
+      ].slice(0, Math.floor(Math.random() * 3) + 3),
+      riskFactors: [
+        '토지 비용 상승 가능성',
+        '교통 혼잡도 증가',
+        '인력 수급 경쟁 심화'
+      ].slice(0, Math.floor(Math.random() * 2) + 1)
+    })).sort((a, b) => (b.suitabilityScore + b.policyImpact) - (a.suitabilityScore + a.policyImpact));
     
     setRecommendations(scored);
     setIsSearched(true);
+  };
+
+  const getPolicyScenarioDescription = (scenario: string) => {
+    switch (scenario) {
+      case 'tax_incentive':
+        return '세금 인센티브 정책 적용 시';
+      case 'infrastructure':
+        return '교통 인프라 확충 정책 적용 시';
+      case 'r_and_d':
+        return 'R&D 지원 정책 강화 시';
+      default:
+        return '현재 정책 기준';
+    }
   };
 
   return (
@@ -66,13 +90,31 @@ const Recommendation = () => {
                 ))}
               </div>
               
-              <div className="flex space-x-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Input
                   placeholder={`${searchType === 'company' ? '예: 삼성전자' : searchType === 'industry' ? '예: 반도체 제조업' : '예: 26121'}`}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-1"
+                  className="md:col-span-2"
                 />
+                
+                <Select value={policyScenario} onValueChange={setPolicyScenario}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="정책 시나리오" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="current">현재 정책</SelectItem>
+                    <SelectItem value="tax_incentive">세금 인센티브</SelectItem>
+                    <SelectItem value="infrastructure">인프라 확충</SelectItem>
+                    <SelectItem value="r_and_d">R&D 지원 강화</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="flex justify-between items-center">
+                <p className="text-sm text-gray-600">
+                  {getPolicyScenarioDescription(policyScenario)}
+                </p>
                 <Button onClick={handleSearch} className="px-8">
                   추천 받기
                 </Button>
@@ -86,7 +128,14 @@ const Recommendation = () => {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold text-gray-900">추천 결과</h2>
-              <Badge variant="outline">{recommendations.length}개 산업단지 분석</Badge>
+              <div className="flex space-x-2">
+                <Badge variant="outline">{recommendations.length}개 산업단지 분석</Badge>
+                {policyScenario !== 'current' && (
+                  <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                    정책 시나리오 적용
+                  </Badge>
+                )}
+              </div>
             </div>
 
             {recommendations.map((complex, index) => (
@@ -99,7 +148,14 @@ const Recommendation = () => {
                         {index === 0 && <Badge className="bg-blue-600">최적 추천</Badge>}
                         <div className="flex items-center">
                           <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                          <span className="text-sm font-medium ml-1">{complex.suitabilityScore.toFixed(1)}</span>
+                          <span className="text-sm font-medium ml-1">
+                            {(complex.suitabilityScore + complex.policyImpact).toFixed(1)}
+                          </span>
+                          {complex.policyImpact !== 0 && (
+                            <span className={`text-xs ml-1 ${complex.policyImpact > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              ({complex.policyImpact > 0 ? '+' : ''}{complex.policyImpact.toFixed(1)})
+                            </span>
+                          )}
                         </div>
                       </div>
                       <p className="text-gray-600 mb-3 flex items-center">
@@ -107,52 +163,71 @@ const Recommendation = () => {
                         {complex.location}
                       </p>
                       
-                      {/* 추천 근거 */}
-                      <div className="mb-4">
-                        <h4 className="text-sm font-medium text-gray-700 mb-2">추천 근거</h4>
-                        <div className="flex flex-wrap gap-2">
-                          {complex.reasons.map((reason: string, idx: number) => (
-                            <Badge key={idx} variant="secondary" className="text-xs">
-                              {reason}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* 주요 지표 */}
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="flex items-center space-x-2">
-                          <Building2 className="w-4 h-4 text-gray-500" />
-                          <div>
-                            <p className="text-xs text-gray-500">입주기업</p>
-                            <p className="text-sm font-medium">{complex.totalCompanies}개</p>
-                          </div>
-                        </div>
+                      <Tabs defaultValue="strengths" className="w-full">
+                        <TabsList className="grid w-full grid-cols-3">
+                          <TabsTrigger value="strengths" className="text-xs">추천 근거</TabsTrigger>
+                          <TabsTrigger value="indicators" className="text-xs">주요 지표</TabsTrigger>
+                          <TabsTrigger value="risks" className="text-xs">리스크 요인</TabsTrigger>
+                        </TabsList>
                         
-                        <div className="flex items-center space-x-2">
-                          <Users className="w-4 h-4 text-gray-500" />
-                          <div>
-                            <p className="text-xs text-gray-500">고용인원</p>
-                            <p className="text-sm font-medium">{complex.employmentCount.toLocaleString()}명</p>
+                        <TabsContent value="strengths" className="mt-4">
+                          <div className="flex flex-wrap gap-2">
+                            {complex.reasons.map((reason: string, idx: number) => (
+                              <Badge key={idx} variant="secondary" className="text-xs bg-green-100 text-green-800">
+                                <Shield className="w-3 h-3 mr-1" />
+                                {reason}
+                              </Badge>
+                            ))}
                           </div>
-                        </div>
+                        </TabsContent>
                         
-                        <div className="flex items-center space-x-2">
-                          <TrendingUp className="w-4 h-4 text-gray-500" />
-                          <div>
-                            <p className="text-xs text-gray-500">성장점수</p>
-                            <p className="text-sm font-medium">{complex.growthScore}/10</p>
+                        <TabsContent value="indicators" className="mt-4">
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="flex items-center space-x-2">
+                              <Building2 className="w-4 h-4 text-gray-500" />
+                              <div>
+                                <p className="text-xs text-gray-500">입주기업</p>
+                                <p className="text-sm font-medium">{complex.totalCompanies}개</p>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center space-x-2">
+                              <Users className="w-4 h-4 text-gray-500" />
+                              <div>
+                                <p className="text-xs text-gray-500">고용인원</p>
+                                <p className="text-sm font-medium">{complex.employmentCount.toLocaleString()}명</p>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center space-x-2">
+                              <TrendingUp className="w-4 h-4 text-gray-500" />
+                              <div>
+                                <p className="text-xs text-gray-500">성장점수</p>
+                                <p className="text-sm font-medium">{complex.growthScore}/10</p>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center space-x-2">
+                              <BarChart3 className="w-4 h-4 text-gray-500" />
+                              <div>
+                                <p className="text-xs text-gray-500">입주율</p>
+                                <p className="text-sm font-medium">{complex.occupancyRate}%</p>
+                              </div>
+                            </div>
                           </div>
-                        </div>
+                        </TabsContent>
                         
-                        <div className="flex items-center space-x-2">
-                          <MapPin className="w-4 h-4 text-gray-500" />
-                          <div>
-                            <p className="text-xs text-gray-500">교통접근성</p>
-                            <p className="text-sm font-medium">{complex.trafficAccessibility}/10</p>
+                        <TabsContent value="risks" className="mt-4">
+                          <div className="flex flex-wrap gap-2">
+                            {complex.riskFactors.map((risk: string, idx: number) => (
+                              <Badge key={idx} variant="destructive" className="text-xs bg-red-100 text-red-800">
+                                <Zap className="w-3 h-3 mr-1" />
+                                {risk}
+                              </Badge>
+                            ))}
                           </div>
-                        </div>
-                      </div>
+                        </TabsContent>
+                      </Tabs>
                     </div>
                   </div>
 
@@ -170,6 +245,32 @@ const Recommendation = () => {
                 </CardContent>
               </Card>
             ))}
+
+            {/* 정책 시나리오 분석 요약 */}
+            {policyScenario !== 'current' && (
+              <Card className="bg-gradient-to-r from-blue-50 to-indigo-50">
+                <CardContent className="p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                    <BarChart3 className="w-5 h-5 mr-2 text-blue-600" />
+                    정책 시나리오 영향 분석
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-700 mb-1">긍정적 영향</h4>
+                      <p className="text-sm text-gray-600">평균 적합도 점수 +{(Math.random() * 1.5 + 0.5).toFixed(1)}점 상승</p>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-700 mb-1">예상 비용</h4>
+                      <p className="text-sm text-gray-600">정책 시행 비용 {(Math.random() * 500 + 200).toFixed(0)}억원</p>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-700 mb-1">시행 기간</h4>
+                      <p className="text-sm text-gray-600">{Math.floor(Math.random() * 3 + 2)}년 소요 예상</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
 
@@ -183,11 +284,15 @@ const Recommendation = () => {
                 업종, 기업명 또는 KSIC 코드를 입력하면<br />
                 충북 지역 내 최적의 산업단지를 추천해드립니다.
               </p>
-              <div className="text-sm text-gray-500">
-                <p>✓ 업종 집적도 분석</p>
-                <p>✓ 교통 접근성 평가</p>
-                <p>✓ 고용 안정성 검토</p>
-                <p>✓ 성장 가능성 예측</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-500 max-w-md mx-auto">
+                <div>
+                  <p>✓ 업종 집적도 분석</p>
+                  <p>✓ 교통 접근성 평가</p>
+                </div>
+                <div>
+                  <p>✓ 고용 안정성 검토</p>
+                  <p>✓ 정책 시나리오 비교</p>
+                </div>
               </div>
             </CardContent>
           </Card>
