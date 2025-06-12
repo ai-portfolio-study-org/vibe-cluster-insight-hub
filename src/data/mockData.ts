@@ -1,4 +1,3 @@
-
 // 더미 데이터 정의
 export interface IndustrialComplex {
   id: string;
@@ -12,6 +11,16 @@ export interface IndustrialComplex {
   occupancyRate: number;
   growthScore: number;
   trafficAccessibility: number;
+  totalEmployees: number;
+  totalInvestment: number;
+  accessibilityScore: {
+    highway: number;
+    railway: number;
+    airport: number;
+    port: number;
+  };
+  industryTypes: string[];
+  growthRate: number;
 }
 
 export interface Company {
@@ -27,12 +36,21 @@ export interface Company {
 
 export interface GrowthData {
   region: string;
+  name: string;
   lat: number;
   lng: number;
   currentScore: number;
   predictedScore: number;
   employmentGrowth: number;
   investmentGrowth: number;
+  weightedAccessibility: number;
+  logisticsCost: number;
+  accessibilityBreakdown: {
+    highway: number;
+    railway: number;
+    airport: number;
+    port: number;
+  };
 }
 
 export const mockIndustrialComplexes: IndustrialComplex[] = [
@@ -47,7 +65,17 @@ export const mockIndustrialComplexes: IndustrialComplex[] = [
     mainIndustries: ["IT/소프트웨어", "바이오", "전자부품"],
     occupancyRate: 87.5,
     growthScore: 8.4,
-    trafficAccessibility: 9.2
+    trafficAccessibility: 9.2,
+    totalEmployees: 12500,
+    totalInvestment: 2500000000000,
+    accessibilityScore: {
+      highway: 92,
+      railway: 85,
+      airport: 78,
+      port: 65
+    },
+    industryTypes: ['반도체', '전자부품', '자동차부품'],
+    growthRate: 8.5
   },
   {
     id: "2", 
@@ -60,7 +88,17 @@ export const mockIndustrialComplexes: IndustrialComplex[] = [
     mainIndustries: ["바이오", "제약", "의료기기"],
     occupancyRate: 92.1,
     growthScore: 9.1,
-    trafficAccessibility: 8.7
+    trafficAccessibility: 8.7,
+    totalEmployees: 8500,
+    totalInvestment: 1800000000000,
+    accessibilityScore: {
+      highway: 88,
+      railway: 90,
+      airport: 82,
+      port: 70
+    },
+    industryTypes: ['바이오', '제약', '의료기기'],
+    growthRate: 9.2
   },
   {
     id: "3",
@@ -73,7 +111,17 @@ export const mockIndustrialComplexes: IndustrialComplex[] = [
     mainIndustries: ["자동차부품", "기계", "화학"],
     occupancyRate: 78.3,
     growthScore: 7.2,
-    trafficAccessibility: 7.8
+    trafficAccessibility: 7.8,
+    totalEmployees: 9500,
+    totalInvestment: 1500000000000,
+    accessibilityScore: {
+      highway: 85,
+      railway: 75,
+      airport: 60,
+      port: 55
+    },
+    industryTypes: ['기계', '금속', '화학'],
+    growthRate: 7.8
   },
   {
     id: "4",
@@ -86,7 +134,17 @@ export const mockIndustrialComplexes: IndustrialComplex[] = [
     mainIndustries: ["반도체", "디스플레이", "전자"],
     occupancyRate: 85.6,
     growthScore: 8.8,
-    trafficAccessibility: 6.9
+    trafficAccessibility: 6.9,
+    totalEmployees: 6500,
+    totalInvestment: 1200000000000,
+    accessibilityScore: {
+      highway: 78,
+      railway: 65,
+      airport: 55,
+      port: 45
+    },
+    industryTypes: ['시멘트', '건자재', '석회'],
+    growthRate: 6.5
   },
   {
     id: "5",
@@ -99,7 +157,17 @@ export const mockIndustrialComplexes: IndustrialComplex[] = [
     mainIndustries: ["시멘트", "광물", "건자재"],
     occupancyRate: 71.2,
     growthScore: 6.1,
-    trafficAccessibility: 5.4
+    trafficAccessibility: 5.4,
+    totalEmployees: 7800,
+    totalInvestment: 1400000000000,
+    accessibilityScore: {
+      highway: 70,
+      railway: 60,
+      airport: 45,
+      port: 40
+    },
+    industryTypes: ['전자', '기계', '자동차부품'],
+    growthRate: 7.2
   }
 ];
 
@@ -146,43 +214,115 @@ export const mockCompanies: Company[] = [
   }
 ];
 
-export const mockGrowthData: GrowthData[] = [
+export const mockGrowthData = [
   {
-    region: "청주시 흥덕구",
+    region: "청주시",
+    name: "청주시",
     lat: 36.6424,
     lng: 127.4890,
-    currentScore: 8.4,
-    predictedScore: 9.1,
-    employmentGrowth: 12.5,
-    investmentGrowth: 18.3
-  },
-  {
-    region: "진천군",
-    lat: 36.8339,
-    lng: 127.4253,
     currentScore: 7.2,
-    predictedScore: 8.0,
-    employmentGrowth: 8.7,
-    investmentGrowth: 15.2
+    predictedScore: 8.5,
+    employmentGrowth: 12,
+    investmentGrowth: 15,
+    weightedAccessibility: 85,
+    logisticsCost: 95000000,
+    accessibilityBreakdown: {
+      highway: 90,
+      railway: 85,
+      airport: 80,
+      port: 70,
+    },
   },
   {
-    region: "음성군",
-    lat: 36.9442,
-    lng: 127.6891,
-    currentScore: 8.8,
-    predictedScore: 9.4,
-    employmentGrowth: 15.6,
-    investmentGrowth: 22.1
+    region: "충주시",
+    name: "충주시",
+    lat: 36.9910,
+    lng: 127.9260,
+    currentScore: 6.8,
+    predictedScore: 7.5,
+    employmentGrowth: 10,
+    investmentGrowth: 12,
+    weightedAccessibility: 78,
+    logisticsCost: 105000000,
+    accessibilityBreakdown: {
+      highway: 85,
+      railway: 75,
+      airport: 65,
+      port: 60,
+    },
   },
   {
     region: "제천시",
+    name: "제천시",
     lat: 37.1327,
-    lng: 128.1906,
-    currentScore: 6.1,
-    predictedScore: 6.8,
-    employmentGrowth: 5.3,
-    investmentGrowth: 8.9
-  }
+    lng: 128.1910,
+    currentScore: 6.5,
+    predictedScore: 7.2,
+    employmentGrowth: 9,
+    investmentGrowth: 11,
+    weightedAccessibility: 75,
+    logisticsCost: 110000000,
+    accessibilityBreakdown: {
+      highway: 80,
+      railway: 70,
+      airport: 60,
+      port: 55,
+    },
+  },
+  {
+    region: "음성군",
+    name: "음성군",
+    lat: 36.9404,
+    lng: 127.6900,
+    currentScore: 5.8,
+    predictedScore: 6.5,
+    employmentGrowth: 7,
+    investmentGrowth: 9,
+    weightedAccessibility: 70,
+    logisticsCost: 115000000,
+    accessibilityBreakdown: {
+      highway: 75,
+      railway: 65,
+      airport: 55,
+      port: 50,
+    },
+  },
+  {
+    region: "진천군",
+    name: "진천군",
+    lat: 36.8550,
+    lng: 127.4350,
+    currentScore: 5.5,
+    predictedScore: 6.2,
+    employmentGrowth: 6,
+    investmentGrowth: 8,
+    weightedAccessibility: 68,
+    logisticsCost: 118000000,
+    accessibilityBreakdown: {
+      highway: 72,
+      railway: 62,
+      airport: 52,
+      port: 48,
+    },
+  },
+  {
+    region: "단양군",
+    name: "단양군",
+    lat: 36.9845,
+    lng: 128.3650,
+    currentScore: 5.2,
+    predictedScore: 5.8,
+    employmentGrowth: 5,
+    investmentGrowth: 7,
+    weightedAccessibility: 65,
+    logisticsCost: 120000000,
+    accessibilityBreakdown: {
+      highway: 70,
+      railway: 60,
+      airport: 50,
+      port: 45,
+    },
+  },
 ];
 
 export const mockNetworkData = {

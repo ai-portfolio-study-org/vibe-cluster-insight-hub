@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -21,12 +20,14 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/recommendation" element={<Recommendation />} />
-          <Route path="/cluster-map" element={<ClusterMap />} />
-          <Route path="/network" element={<Network />} />
+          {/* <Route path="/" element={<Dashboard />} /> */}
+          <Route path="/" element={<GrowthScan />} />
+
+          {/* <Route path="/recommendation" element={<Recommendation />} /> */}
+          {/* <Route path="/cluster-map" element={<ClusterMap />} /> */}
+          {/* <Route path="/network" element={<Network />} /> */}
           <Route path="/growth-scan" element={<GrowthScan />} />
-          <Route path="/scenario" element={<Scenario />} />
+          {/* <Route path="/scenario" element={<Scenario />} /> */}
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
