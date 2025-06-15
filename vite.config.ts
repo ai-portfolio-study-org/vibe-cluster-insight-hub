@@ -14,7 +14,7 @@ export default defineConfig(({ mode }) => ({
     mode === 'development' &&
     componentTagger(),
   ].filter(Boolean),
-  base: "/vibe-cluster-insight-hub/",
+  base: "/",
   build: {
     outDir: "dist",
     assetsDir: "",
