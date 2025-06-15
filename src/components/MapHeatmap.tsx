@@ -12,6 +12,52 @@ interface MapHeatmapProps {
   onRegionClick?: (region: string) => void;
 }
 
+interface CargoStation {
+  name: string;
+  lat: number;
+  lng: number;
+  type: "시멘트" | "컨테이너" | "석탄" | "철강" | "유류" | "광석";
+}
+
+const DIRECTIONS_BASE =
+  "https://naveropenapi.apigw.ntruss.com/map-direction/v1/driving";
+
+async function fetchRoute({
+  start,
+  goal,
+  vias = [],
+}: {
+  start: [number, number];
+  goal: [number, number];
+  vias?: [number, number][];
+}) {
+  const coords = [
+    `start=${start[1]},${start[0]}`,
+    ...vias.map((v, i) => `via=${v[1]},${v[0]}`),
+    `goal=${goal[1]},${goal[0]}`,
+  ].join("&");
+  const url = `${DIRECTIONS_BASE}/15?${coords}&option=trafast`; // 최대 15 via
+  const res = await fetch(url, {
+    headers: {
+      "X-NCP-APIGW-API-KEY-ID": import.meta.env.VITE_NAVER_MAP_API_KEY_ID,
+      "X-NCP-APIGW-API-KEY": import.meta.env.VITE_NAVER_CLIENT_SECRET,
+    },
+  });
+  return res.json();
+}
+
+function drawRoute(map, routeJson) {
+  const coords = routeJson.route.traoptimal[0].path.map(
+    ([lng, lat]) => new window.naver.maps.LatLng(lat, lng)
+  );
+  return new window.naver.maps.Polyline({
+    map,
+    path: coords,
+    strokeColor: "#10B981",
+    strokeOpacity: 0.7,
+    strokeWeight: 5,
+  });
+}
 const MapHeatmap = ({ data, onRegionClick }: MapHeatmapProps) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<naver.maps.Map | null>(null);
@@ -30,7 +76,73 @@ const MapHeatmap = ({ data, onRegionClick }: MapHeatmapProps) => {
       },
     });
 
+    const getColorByCargoType = (type: string) => {
+      switch (type) {
+        case "시멘트":
+          return "#6B7280"; // 회색
+        case "컨테이너":
+          return "#3B82F6"; // 파랑
+        case "석탄":
+          return "#1F2937"; // 진회색
+        case "철강":
+          return "#EF4444"; // 빨강
+        case "유류":
+          return "#F59E0B"; // 주황
+        case "광석":
+          return "#10B981"; // 초록
+        default:
+          return "#9CA3AF";
+      }
+    };
+
+    const polyline = new window.naver.maps.Polyline({
+      map: map,
+      path: [
+        new naver.maps.LatLng(37.365620929135716, 127.1036195755005),
+        new naver.maps.LatLng(37.365620929135716, 127.11353302001953),
+        new naver.maps.LatLng(37.3606921307849, 127.10452079772949),
+        new naver.maps.LatLng(37.36821310838941, 127.10814714431763),
+        new naver.maps.LatLng(37.360760351656545, 127.11299657821654),
+        new naver.maps.LatLng(37.365620929135716, 127.1036195755005),
+      ],
+      clickable: true, // 사용자 인터랙션을 받기 위해 clickable을 true로 설정합니다.
+      strokeColor: "#5347AA",
+      strokeStyle: "longdash",
+      strokeOpacity: 0.8,
+      strokeWeight: 5,
+    });
+
+    map.fitBounds(polyline.getBounds());
+
     mapInstance.current = map;
+    const cargoStations: CargoStation[] = [
+      { name: "도담", lat: 36.988, lng: 128.417, type: "시멘트" },
+      { name: "입석리", lat: 37.125, lng: 128.5, type: "시멘트" },
+      { name: "쌍용", lat: 37.185, lng: 128.345, type: "시멘트" },
+      { name: "삼화", lat: 37.549, lng: 129.108, type: "시멘트" },
+      { name: "오봉", lat: 37.324, lng: 126.823, type: "컨테이너" },
+      { name: "부산신항", lat: 35.073, lng: 128.819, type: "컨테이너" },
+      // ...
+    ];
+
+    const hubs = [
+      { region: "부산항", lat: 35.1, lng: 129.1, label: "부산항" },
+      { region: "광양항", lat: 34.9, lng: 127.7, label: "광양항" },
+      { region: "포항", lat: 36.0, lng: 129.4, label: "포항" },
+    ];
+
+    hubs.forEach((hub) => {
+      new window.naver.maps.Marker({
+        position: new window.naver.maps.LatLng(hub.lat, hub.lng),
+        map: map,
+        title: hub.label,
+        icon: {
+          content: `<div style="background:#000;color:#fff;padding:4px 8px;border-radius:6px;">${hub.label}</div>`,
+          size: new window.naver.maps.Size(12, 12),
+          anchor: new window.naver.maps.Point(12, 12),
+        },
+      });
+    });
 
     // 히트맵 마커 생성
     data.forEach((item) => {
@@ -50,6 +162,27 @@ const MapHeatmap = ({ data, onRegionClick }: MapHeatmapProps) => {
           size: new window.naver.maps.Size(20, 20),
           anchor: new window.naver.maps.Point(10, 10),
         },
+      });
+
+      cargoStations.forEach((station) => {
+        const marker = new window.naver.maps.Marker({
+          position: new window.naver.maps.LatLng(station.lat, station.lng),
+          map: map,
+          title: `${station.name} (${station.type})`,
+          icon: {
+            content: `<div style="
+        padding: 4px 6px;
+        background: ${getColorByCargoType(station.type)};
+        color: white;
+        font-size: 12px;
+        border-radius: 4px;
+        font-weight: bold;">
+        ${station.name}
+      </div>`,
+            anchor: new window.naver.maps.Point(10, 10),
+            size: new window.naver.maps.Size(20, 20),
+          },
+        });
       });
 
       window.naver.maps.Event.addListener(marker, "click", () => {
@@ -91,7 +224,7 @@ const MapHeatmap = ({ data, onRegionClick }: MapHeatmapProps) => {
     const script = document.createElement("script");
     script.src = `https://openapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${
       import.meta.env.VITE_NAVER_MAP_API_KEY_ID
-    }&submodules=geocoder`;
+    }&submodules=geocoder,drawing`;
     script.async = true;
     document.head.appendChild(script);
 
@@ -114,6 +247,19 @@ const MapHeatmap = ({ data, onRegionClick }: MapHeatmapProps) => {
 
   return (
     <Card>
+      <button
+        onClick={async () => {
+          const routeData = await fetchRoute({
+            start: [37.324, 126.823], // 오봉
+            vias: [[35.073, 128.819]], // 부산신항
+            goal: [36.988, 128.417], // 도담 (예시)
+          });
+          console.log("Route data", routeData);
+          drawRoute(mapInstance.current, routeData);
+        }}
+      >
+        경로보기
+      </button>
       <CardHeader>
         <CardTitle className="flex items-center">
           <MapPin className="w-5 h-5 mr-2 text-blue-600" />

@@ -92,7 +92,7 @@ interface Complex {
 const GrowthScan = () => {
   const [selectedRegion, setSelectedRegion] = useState<Region | null>(null);
   const [selectedIndustry, setSelectedIndustry] = useState<string>("");
-  const [predictionYears, setPredictionYears] = useState<number>(3);
+  const [predictionYears, setPredictionYears] = useState<number>(0);
   const [simulationMode, setSimulationMode] = useState(false);
   const [activeScenario, setActiveScenario] = useState<string>("");
 
@@ -295,15 +295,19 @@ const GrowthScan = () => {
                 <div className="flex items-center space-x-4">
                   <Slider
                     id="predictionYears"
-                    min={0}
+                    min={-5}
                     max={5}
                     step={1}
                     value={[predictionYears]}
                     onValueChange={(value) => setPredictionYears(value[0])}
                     className="w-full"
                   />
-                  <span className="text-sm font-medium min-w-[60px]">
-                    {predictionYears}년 후
+                  <span className="text-sm font-medium min-w-[80px]">
+                    {predictionYears < 0
+                      ? `${Math.abs(predictionYears)}년 전`
+                      : predictionYears === 0
+                      ? "현재"
+                      : `${predictionYears}년 후`}
                   </span>
                 </div>
               </div>
