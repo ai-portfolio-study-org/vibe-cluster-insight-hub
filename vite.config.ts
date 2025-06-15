@@ -17,15 +17,15 @@ export default defineConfig(({ mode }) => ({
   base: "/vibe-cluster-insight-hub/",
   build: {
     outDir: "dist",
-    assetsDir: "",
+    assetsDir: "assets",
     rollupOptions: {
       input: {
-        main: path.resolve(__dirname, "src/main.tsx"),
+        main: path.resolve(__dirname, "index.html"),
       },
       output: {
-        entryFileNames: "main.js",
-        chunkFileNames: "[name]-[hash].js",
-        assetFileNames: "[name]-[hash][extname]",
+        entryFileNames: "assets/[name]-[hash].js",
+        chunkFileNames: "assets/[name]-[hash].js",
+        assetFileNames: "assets/[name]-[hash][extname]",
       },
     },
   },
