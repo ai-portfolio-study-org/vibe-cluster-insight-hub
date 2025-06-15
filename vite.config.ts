@@ -14,16 +14,16 @@ export default defineConfig(({ mode }) => ({
     mode === 'development' &&
     componentTagger(),
   ].filter(Boolean),
-  base: "/",
+  base: "/vibe-cluster-insight-hub/",
   build: {
     outDir: "dist",
     assetsDir: "",
     rollupOptions: {
       input: {
-        main: path.resolve(__dirname, "index.html"),
+        main: path.resolve(__dirname, "src/main.tsx"),
       },
       output: {
-        entryFileNames: "index.js",
+        entryFileNames: "main.js",
         chunkFileNames: "[name]-[hash].js",
         assetFileNames: "[name]-[hash][extname]",
       },
