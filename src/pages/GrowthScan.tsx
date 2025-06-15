@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
 import {
   TrendingUp,
   TrendingDown,
@@ -91,9 +92,7 @@ interface Complex {
 const GrowthScan = () => {
   const [selectedRegion, setSelectedRegion] = useState<Region | null>(null);
   const [selectedIndustry, setSelectedIndustry] = useState<string>("");
-  const [timeframe, setTimeframe] = useState<"1year" | "3year" | "5year">(
-    "3year"
-  );
+  const [predictionYears, setPredictionYears] = useState<number>(3);
   const [simulationMode, setSimulationMode] = useState(false);
   const [activeScenario, setActiveScenario] = useState<string>("");
 
@@ -268,56 +267,6 @@ const GrowthScan = () => {
           </div>
         </div>
 
-        {/* 교통·물류 상황 요약 */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Route className="w-5 h-5 mr-2 text-blue-600" />
-              충북 교통·물류 현황
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="p-4 bg-blue-50 rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-blue-700">고속도로 혼잡도</span>
-                  <Car className="w-4 h-4 text-blue-600" />
-                </div>
-                <div className="text-2xl font-bold text-blue-900">72%</div>
-                <div className="text-xs text-blue-600 mt-1">전년 대비 -3%p</div>
-              </div>
-              <div className="p-4 bg-green-50 rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-green-700">철도 화물량</span>
-                  <Train className="w-4 h-4 text-green-600" />
-                </div>
-                <div className="text-2xl font-bold text-green-900">85%</div>
-                <div className="text-xs text-green-600 mt-1">
-                  전년 대비 +5%p
-                </div>
-              </div>
-              <div className="p-4 bg-purple-50 rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-purple-700">공항 화물량</span>
-                  <Plane className="w-4 h-4 text-purple-600" />
-                </div>
-                <div className="text-2xl font-bold text-purple-900">68%</div>
-                <div className="text-xs text-purple-600 mt-1">
-                  전년 대비 +2%p
-                </div>
-              </div>
-              <div className="p-4 bg-cyan-50 rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-cyan-700">항만 화물량</span>
-                  <Ship className="w-4 h-4 text-cyan-600" />
-                </div>
-                <div className="text-2xl font-bold text-cyan-900">75%</div>
-                <div className="text-xs text-cyan-600 mt-1">전년 대비 +4%p</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* 업종 선택 및 시뮬레이션 설정 */}
         <Card className="mb-6">
           <CardContent className="p-6">
@@ -341,56 +290,23 @@ const GrowthScan = () => {
                 </Select>
               </div>
 
-              <div>
-                <Label htmlFor="timeframe">예측 기간</Label>
-                <Select
-                  value={timeframe}
-                  onValueChange={(value: "1year" | "3year" | "5year") =>
-                    setTimeframe(value)
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(timeframeLabels).map(([key, label]) => (
-                      <SelectItem key={key} value={key}>
-                        {label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="simulation"
-                  checked={simulationMode}
-                  onCheckedChange={setSimulationMode}
-                />
-                <Label htmlFor="simulation">시뮬레이션 모드</Label>
-              </div>
-
-              {simulationMode && (
-                <div>
-                  <Label htmlFor="scenario">시나리오</Label>
-                  <Select
-                    value={activeScenario}
-                    onValueChange={setActiveScenario}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="시나리오 선택" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {scenarios.map((scenario) => (
-                        <SelectItem key={scenario.id} value={scenario.id}>
-                          {scenario.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              <div className="space-y-2">
+                <Label htmlFor="predictionYears">예측 기간</Label>
+                <div className="flex items-center space-x-4">
+                  <Slider
+                    id="predictionYears"
+                    min={0}
+                    max={5}
+                    step={1}
+                    value={[predictionYears]}
+                    onValueChange={(value) => setPredictionYears(value[0])}
+                    className="w-full"
+                  />
+                  <span className="text-sm font-medium min-w-[60px]">
+                    {predictionYears}년 후
+                  </span>
                 </div>
-              )}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -434,6 +350,430 @@ const GrowthScan = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* 메인 분석 영역 */}
           <div className="lg:col-span-2 space-y-6">
+            {/* 지도와 시나리오 컨테이너 */}
+            <div className="relative">
+              {/* 시나리오 선택 카드 - 지도 좌측에 오버레이 */}
+              <div className="absolute left-4 top-4 z-10 w-80">
+                <Card className="bg-white/95 backdrop-blur-sm shadow-lg">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="flex items-center text-sm">
+                      <Zap className="w-4 h-4 mr-2 text-blue-600" />
+                      시나리오 선택
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {scenarios.map((scenario) => (
+                      <div
+                        key={scenario.id}
+                        className={`p-3 rounded-lg border cursor-pointer transition-all ${
+                          activeScenario === scenario.id
+                            ? "border-blue-500 bg-blue-50"
+                            : "border-gray-200 hover:border-gray-300"
+                        }`}
+                        onClick={() => setActiveScenario(scenario.id)}
+                      >
+                        <div className="flex items-start space-x-2">
+                          <div
+                            className={`p-1.5 rounded-full ${
+                              activeScenario === scenario.id
+                                ? "bg-blue-100"
+                                : "bg-gray-100"
+                            }`}
+                          >
+                            <Zap
+                              className={`w-3 h-3 ${
+                                activeScenario === scenario.id
+                                  ? "text-blue-600"
+                                  : "text-gray-600"
+                              }`}
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="font-medium text-sm text-gray-900">
+                              {scenario.name}
+                            </h3>
+                            <p className="text-xs text-gray-600 mt-0.5">
+                              {scenario.description}
+                            </p>
+                            <div className="flex items-center space-x-2 mt-1.5">
+                              <Badge
+                                variant="secondary"
+                                className={`text-xs ${
+                                  activeScenario === scenario.id
+                                    ? "bg-blue-100 text-blue-800"
+                                    : "bg-gray-100 text-gray-800"
+                                }`}
+                              >
+                                {scenario.impact}
+                              </Badge>
+                              <span className="text-xs text-gray-500">
+                                {scenario.affected.join(", ")}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* 지도 */}
+              <MapHeatmap
+                data={mockGrowthData.map((region) => ({
+                  region: region.region,
+                  lat: region.lat,
+                  lng: region.lng,
+                  score: region.predictedScore,
+                }))}
+                onRegionClick={(region) => {
+                  const selectedRegion = mockGrowthData.find(
+                    (r) => r.region === region
+                  );
+                  if (selectedRegion) {
+                    setSelectedRegion(selectedRegion);
+                  }
+                }}
+              />
+            </div>
+
+            {/* 업종별 수송경로 분석 */}
+            {selectedIndustry && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Route className="w-5 h-5 mr-2 text-purple-600" />
+                    {
+                      industries.find((i) => i.value === selectedIndustry)
+                        ?.label
+                    }{" "}
+                    대표 수송경로 분석
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                      <div className="p-3 bg-blue-50 rounded-lg">
+                        <h4 className="font-medium text-blue-900 mb-2">
+                          주요 원자재 수송
+                        </h4>
+                        <div className="space-y-1 text-blue-700">
+                          {selectedIndustry === "cement" && (
+                            <>
+                              <p>• 석회석: 단양 → 제천 (철도 95%)</p>
+                              <p>• 석탄: 인천항 → 제천 (트럭)</p>
+                            </>
+                          )}
+                          {selectedIndustry === "steel" && (
+                            <>
+                              <p>• 철광석: 인천항 → 청주 (철도)</p>
+                              <p>• 코크스: 광양항 → 청주 (철도)</p>
+                            </>
+                          )}
+                          {selectedIndustry === "semiconductor" && (
+                            <>
+                              <p>• 실리콘웨이퍼: 인천공항 → 청주</p>
+                              <p>• 화학원료: 인천항 → 음성</p>
+                            </>
+                          )}
+                          {!["cement", "steel", "semiconductor"].includes(
+                            selectedIndustry
+                          ) && (
+                            <>
+                              <p>• 주요 원자재: 인천항/공항</p>
+                              <p>• 부품: 서울/경기 → 충북</p>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="p-3 bg-green-50 rounded-lg">
+                        <h4 className="font-medium text-green-900 mb-2">
+                          완제품 출하
+                        </h4>
+                        <div className="space-y-1 text-green-700">
+                          <p>• 국내: 고속도로 (70%)</p>
+                          <p>• 수출: 인천공항/항 (85%)</p>
+                          <p>• 중국: 인천항 (해운)</p>
+                        </div>
+                      </div>
+
+                      <div className="p-3 bg-yellow-50 rounded-lg">
+                        <h4 className="font-medium text-yellow-900 mb-2">
+                          물류비 절감 포인트
+                        </h4>
+                        <div className="space-y-1 text-yellow-700">
+                          <p>• 철도 접근성 +10% → 5% 절감</p>
+                          <p>• 고속도로 접근성 +10% → 3% 절감</p>
+                          <p>• 복합 운송 활용 → 8% 절감</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* 선택된 지역/산업단지 상세 정보 */}
+            {selectedRegion && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <MapPin className="w-5 h-5 mr-2 text-blue-600" />
+                    {selectedRegion.name || selectedRegion.region} 상세 분석
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* 교통 접근성 분석 */}
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-gray-900">
+                      교통 접근성 분석
+                    </h3>
+                    <div className="flex gap-6">
+                      {/* 레이더 차트 */}
+                      <div className="w-1/2">
+                        <ResponsiveContainer width="100%" height={200}>
+                          <RadarChart data={getRadarData(selectedRegion)}>
+                            <PolarGrid />
+                            <PolarAngleAxis dataKey="subject" />
+                            <PolarRadiusAxis angle={30} domain={[0, 100]} />
+                            <Radar
+                              name="접근성"
+                              dataKey="A"
+                              stroke="#3B82F6"
+                              fill="#3B82F6"
+                              fillOpacity={0.3}
+                            />
+                          </RadarChart>
+                        </ResponsiveContainer>
+                      </div>
+
+                      {/* 접근성 점수 및 물류비 */}
+                      <div className="w-1/2 space-y-6">
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-gray-600">
+                              종합 접근성 점수
+                            </span>
+                            <span className="font-semibold text-lg">
+                              {selectedRegion.weightedAccessibility}/100
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-gray-600">
+                              예상 연간 물류비
+                            </span>
+                            <span className="font-semibold text-lg text-green-600">
+                              {(
+                                selectedRegion.logisticsCost / 100000000
+                              ).toFixed(1)}
+                              억원
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* 성장 점수 */}
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-gray-600">
+                              현재 성장 점수
+                            </span>
+                            <span className="font-semibold text-lg">
+                              {selectedRegion.currentScore}/10
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-gray-600">
+                              예측 성장 점수
+                            </span>
+                            <span className="font-semibold text-lg text-blue-600">
+                              {selectedRegion.predictedScore}/10
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* 성장 동력 */}
+                        <div className="space-y-3">
+                          <h4 className="font-medium text-gray-900">
+                            성장 동력
+                          </h4>
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center">
+                                <Users className="w-4 h-4 mr-2 text-blue-500" />
+                                <span className="text-sm text-gray-600">
+                                  고용 증가율
+                                </span>
+                              </div>
+                              <span className="font-medium text-green-600">
+                                +{selectedRegion.employmentGrowth}%
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center">
+                                <DollarSign className="w-4 h-4 mr-2 text-green-500" />
+                                <span className="text-sm text-gray-600">
+                                  투자 증가율
+                                </span>
+                              </div>
+                              <span className="font-medium text-green-600">
+                                +{selectedRegion.investmentGrowth}%
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* 업종별 물류비 절감 방안 */}
+            {selectedIndustry && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>물류비 절감 전략</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  <div className="p-3 bg-green-50 rounded-lg">
+                    <h4 className="font-medium text-green-900 mb-2">
+                      추천 전략
+                    </h4>
+                    <div className="space-y-1 text-green-700">
+                      {selectedIndustry === "cement" && (
+                        <>
+                          <p>• 철도 수송 비율 확대</p>
+                          <p>• 석회석 광산 인근 입지</p>
+                        </>
+                      )}
+                      {selectedIndustry === "steel" && (
+                        <>
+                          <p>• 항만-철도 복합 운송</p>
+                          <p>• 원자재 저장시설 공동 활용</p>
+                        </>
+                      )}
+                      {selectedIndustry === "semiconductor" && (
+                        <>
+                          <p>• 공항 접근성 최우선</p>
+                          <p>• 클린룸 공동 인프라</p>
+                        </>
+                      )}
+                      {!["cement", "steel", "semiconductor"].includes(
+                        selectedIndustry
+                      ) && (
+                        <>
+                          <p>• 복합 운송 네트워크 활용</p>
+                          <p>• 공동 물류센터 구축</p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600">예상 절감율</span>
+                    <span className="font-medium text-green-600">12-18%</span>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* AI 예측 모델 정보 */}
+            <Card>
+              <CardHeader>
+                <CardTitle>AI 예측 모델 정보</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">모델 정확도</span>
+                  <span className="font-medium">87.4%</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">데이터 기간</span>
+                  <span className="font-medium">2019-2024</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">업데이트</span>
+                  <span className="font-medium">월 1회</span>
+                </div>
+                <div className="border-t pt-3">
+                  <h4 className="font-medium mb-2">주요 지표</h4>
+                  <div className="text-xs text-gray-600 space-y-1">
+                    <p>• 교통 접근성 (고속도로, 철도, 공항, 항만)</p>
+                    <p>• 물류비용 최적화 지수</p>
+                    <p>• 업종별 집적 효과</p>
+                    <p>• 정부 정책 영향도</p>
+                    <p>• 기업간 협력 네트워크</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* 사이드바 */}
+          <div className="space-y-6">
+            {/* 교통·물류 상황 요약 */}
+            <Card className="mb-6">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Route className="w-5 h-5 mr-2 text-blue-600" />
+                  충북 교통·물류 현황
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="p-4 bg-blue-50 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-blue-700">
+                        고속도로 혼잡도
+                      </span>
+                      <Car className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <div className="text-2xl font-bold text-blue-900">72%</div>
+                    <div className="text-xs text-blue-600 mt-1">
+                      전년 대비 -3%p
+                    </div>
+                  </div>
+                  <div className="p-4 bg-green-50 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-green-700">
+                        철도 화물량
+                      </span>
+                      <Train className="w-4 h-4 text-green-600" />
+                    </div>
+                    <div className="text-2xl font-bold text-green-900">85%</div>
+                    <div className="text-xs text-green-600 mt-1">
+                      전년 대비 +5%p
+                    </div>
+                  </div>
+                  <div className="p-4 bg-purple-50 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-purple-700">
+                        공항 화물량
+                      </span>
+                      <Plane className="w-4 h-4 text-purple-600" />
+                    </div>
+                    <div className="text-2xl font-bold text-purple-900">
+                      68%
+                    </div>
+                    <div className="text-xs text-purple-600 mt-1">
+                      전년 대비 +2%p
+                    </div>
+                  </div>
+                  <div className="p-4 bg-cyan-50 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-cyan-700">항만 화물량</span>
+                      <Ship className="w-4 h-4 text-cyan-600" />
+                    </div>
+                    <div className="text-2xl font-bold text-cyan-900">75%</div>
+                    <div className="text-xs text-cyan-600 mt-1">
+                      전년 대비 +4%p
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* 업종별 추천 산업단지 */}
             {selectedIndustry && (
               <Card>
@@ -552,289 +892,6 @@ const GrowthScan = () => {
                 </CardContent>
               </Card>
             )}
-
-            {/* 지역별 성장 히트맵 */}
-            <MapHeatmap
-              data={mockGrowthData.map((region) => ({
-                region: region.region,
-                lat: region.lat,
-                lng: region.lng,
-                score: region.predictedScore,
-              }))}
-              onRegionClick={(region) => {
-                const selectedRegion = mockGrowthData.find(
-                  (r) => r.region === region
-                );
-                if (selectedRegion) {
-                  setSelectedRegion(selectedRegion);
-                }
-              }}
-            />
-
-            {/* 업종별 수송경로 분석 */}
-            {selectedIndustry && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Route className="w-5 h-5 mr-2 text-purple-600" />
-                    {
-                      industries.find((i) => i.value === selectedIndustry)
-                        ?.label
-                    }{" "}
-                    대표 수송경로 분석
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                      <div className="p-3 bg-blue-50 rounded-lg">
-                        <h4 className="font-medium text-blue-900 mb-2">
-                          주요 원자재 수송
-                        </h4>
-                        <div className="space-y-1 text-blue-700">
-                          {selectedIndustry === "cement" && (
-                            <>
-                              <p>• 석회석: 단양 → 제천 (철도 95%)</p>
-                              <p>• 석탄: 인천항 → 제천 (트럭)</p>
-                            </>
-                          )}
-                          {selectedIndustry === "steel" && (
-                            <>
-                              <p>• 철광석: 인천항 → 청주 (철도)</p>
-                              <p>• 코크스: 광양항 → 청주 (철도)</p>
-                            </>
-                          )}
-                          {selectedIndustry === "semiconductor" && (
-                            <>
-                              <p>• 실리콘웨이퍼: 인천공항 → 청주</p>
-                              <p>• 화학원료: 인천항 → 음성</p>
-                            </>
-                          )}
-                          {!["cement", "steel", "semiconductor"].includes(
-                            selectedIndustry
-                          ) && (
-                            <>
-                              <p>• 주요 원자재: 인천항/공항</p>
-                              <p>• 부품: 서울/경기 → 충북</p>
-                            </>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="p-3 bg-green-50 rounded-lg">
-                        <h4 className="font-medium text-green-900 mb-2">
-                          완제품 출하
-                        </h4>
-                        <div className="space-y-1 text-green-700">
-                          <p>• 국내: 고속도로 (70%)</p>
-                          <p>• 수출: 인천공항/항 (85%)</p>
-                          <p>• 중국: 인천항 (해운)</p>
-                        </div>
-                      </div>
-
-                      <div className="p-3 bg-yellow-50 rounded-lg">
-                        <h4 className="font-medium text-yellow-900 mb-2">
-                          물류비 절감 포인트
-                        </h4>
-                        <div className="space-y-1 text-yellow-700">
-                          <p>• 철도 접근성 +10% → 5% 절감</p>
-                          <p>• 고속도로 접근성 +10% → 3% 절감</p>
-                          <p>• 복합 운송 활용 → 8% 절감</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-
-          {/* 사이드바 */}
-          <div className="space-y-6">
-            {/* 선택된 지역/산업단지 상세 정보 */}
-            {selectedRegion && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <MapPin className="w-5 h-5 mr-2 text-blue-600" />
-                    {selectedRegion.name || selectedRegion.region} 상세 분석
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {selectedRegion.weightedAccessibility && (
-                    <>
-                      {/* 교통 접근성 레이더차트 */}
-                      <div>
-                        <h4 className="font-medium mb-3">교통 접근성 분석</h4>
-                        <ResponsiveContainer width="100%" height={200}>
-                          <RadarChart data={getRadarData(selectedRegion)}>
-                            <PolarGrid />
-                            <PolarAngleAxis dataKey="subject" />
-                            <PolarRadiusAxis angle={30} domain={[0, 100]} />
-                            <Radar
-                              name="접근성"
-                              dataKey="A"
-                              stroke="#3B82F6"
-                              fill="#3B82F6"
-                              fillOpacity={0.3}
-                            />
-                          </RadarChart>
-                        </ResponsiveContainer>
-                      </div>
-
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-gray-600">
-                            종합 접근성 점수
-                          </span>
-                          <span className="font-semibold text-lg">
-                            {selectedRegion.weightedAccessibility}/100
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-gray-600">
-                            예상 연간 물류비
-                          </span>
-                          <span className="font-semibold text-lg text-green-600">
-                            {(selectedRegion.logisticsCost / 100000000).toFixed(
-                              1
-                            )}
-                            억원
-                          </span>
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  {selectedRegion.currentScore && (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">
-                          현재 성장 점수
-                        </span>
-                        <span className="font-semibold text-lg">
-                          {selectedRegion.currentScore}/10
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">
-                          예측 성장 점수
-                        </span>
-                        <span className="font-semibold text-lg text-blue-600">
-                          {selectedRegion.predictedScore}/10
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedRegion.employmentGrowth && (
-                    <div className="border-t pt-4">
-                      <h4 className="font-medium mb-3">성장 동력</h4>
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center">
-                            <Users className="w-4 h-4 mr-2 text-blue-500" />
-                            <span className="text-sm">고용 증가율</span>
-                          </div>
-                          <span className="font-medium text-green-600">
-                            +{selectedRegion.employmentGrowth}%
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center">
-                            <DollarSign className="w-4 h-4 mr-2 text-green-500" />
-                            <span className="text-sm">투자 증가율</span>
-                          </div>
-                          <span className="font-medium text-green-600">
-                            +{selectedRegion.investmentGrowth}%
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-
-            {/* 업종별 물류비 절감 방안 */}
-            {selectedIndustry && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>물류비 절감 전략</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 text-sm">
-                  <div className="p-3 bg-green-50 rounded-lg">
-                    <h4 className="font-medium text-green-900 mb-2">
-                      추천 전략
-                    </h4>
-                    <div className="space-y-1 text-green-700">
-                      {selectedIndustry === "cement" && (
-                        <>
-                          <p>• 철도 수송 비율 확대</p>
-                          <p>• 석회석 광산 인근 입지</p>
-                        </>
-                      )}
-                      {selectedIndustry === "steel" && (
-                        <>
-                          <p>• 항만-철도 복합 운송</p>
-                          <p>• 원자재 저장시설 공동 활용</p>
-                        </>
-                      )}
-                      {selectedIndustry === "semiconductor" && (
-                        <>
-                          <p>• 공항 접근성 최우선</p>
-                          <p>• 클린룸 공동 인프라</p>
-                        </>
-                      )}
-                      {!["cement", "steel", "semiconductor"].includes(
-                        selectedIndustry
-                      ) && (
-                        <>
-                          <p>• 복합 운송 네트워크 활용</p>
-                          <p>• 공동 물류센터 구축</p>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600">예상 절감율</span>
-                    <span className="font-medium text-green-600">12-18%</span>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* AI 예측 모델 정보 */}
-            <Card>
-              <CardHeader>
-                <CardTitle>AI 예측 모델 정보</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600">모델 정확도</span>
-                  <span className="font-medium">87.4%</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600">데이터 기간</span>
-                  <span className="font-medium">2019-2024</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600">업데이트</span>
-                  <span className="font-medium">월 1회</span>
-                </div>
-                <div className="border-t pt-3">
-                  <h4 className="font-medium mb-2">주요 지표</h4>
-                  <div className="text-xs text-gray-600 space-y-1">
-                    <p>• 교통 접근성 (고속도로, 철도, 공항, 항만)</p>
-                    <p>• 물류비용 최적화 지수</p>
-                    <p>• 업종별 집적 효과</p>
-                    <p>• 정부 정책 영향도</p>
-                    <p>• 기업간 협력 네트워크</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
           </div>
         </div>
       </div>

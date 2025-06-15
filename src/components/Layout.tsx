@@ -1,6 +1,5 @@
-
-import { ReactNode } from 'react';
-import Navigation from './Navigation';
+import { ReactNode } from "react";
+import Navigation from "./Navigation";
 
 interface LayoutProps {
   children: ReactNode;
@@ -9,10 +8,8 @@ interface LayoutProps {
 const Layout = ({ children }: LayoutProps) => {
   return (
     <div className="flex min-h-screen bg-gray-50">
-      <Navigation />
-      <main className="flex-1 overflow-auto">
-        {children}
-      </main>
+      {/* <Navigation /> */}
+      <main className="flex-1 overflow-auto">{children}</main>
     </div>
   );
 };
