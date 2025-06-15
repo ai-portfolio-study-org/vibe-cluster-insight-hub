@@ -19,10 +19,13 @@ export default defineConfig(({ mode }) => ({
     outDir: "dist",
     assetsDir: "",
     rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, "index.html"),
+      },
       output: {
-        assetFileNames: "[name]-[hash][extname]",
+        entryFileNames: "index.js",
         chunkFileNames: "[name]-[hash].js",
-        entryFileNames: "[name]-[hash].js",
+        assetFileNames: "[name]-[hash][extname]",
       },
     },
   },
