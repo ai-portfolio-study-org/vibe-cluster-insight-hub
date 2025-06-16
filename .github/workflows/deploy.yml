@@ -30,6 +30,10 @@ jobs:
           cache: "npm"
 
       - name: Install and Build
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_NAVER_MAPS_CLIENT_ID: ${{ secrets.VITE_NAVER_MAPS_CLIENT_ID }}
+
         run: |
           npm install
           npm run build
