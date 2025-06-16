@@ -18,7 +18,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
+      <BrowserRouter basename="/vibe-cluster-insight-hub">
         <Routes>
           {/* <Route path="/" element={<Dashboard />} /> */}
           <Route path="/" element={<GrowthScan />} />
