@@ -112,8 +112,6 @@ const MapHeatmap = ({ data, onRegionClick }: MapHeatmapProps) => {
       strokeWeight: 5,
     });
 
-    map.fitBounds(polyline.getBounds());
-
     mapInstance.current = map;
     const cargoStations: CargoStation[] = [
       { name: "도담", lat: 36.988, lng: 128.417, type: "시멘트" },
