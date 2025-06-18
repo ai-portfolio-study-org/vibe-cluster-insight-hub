@@ -311,6 +311,51 @@ const GrowthScan = () => {
                   </span>
                 </div>
               </div>
+
+              {/* 시나리오 선택 */}
+              <div className="space-y-2">
+                <Label>시나리오 선택</Label>
+                <Select
+                  value={activeScenario}
+                  onValueChange={setActiveScenario}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="시나리오를 선택하세요" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {scenarios.map((scenario) => (
+                      <SelectItem key={scenario.id} value={scenario.id}>
+                        <div className="flex flex-col items-start">
+                          <span className="font-medium">{scenario.name}</span>
+                          <span className="text-xs text-gray-500">
+                            {scenario.description}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* 선택된 시나리오 정보 표시 */}
+                {activeScenario && (
+                  <div className="mt-2 p-3 bg-blue-50 rounded-lg">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <Badge
+                        variant="secondary"
+                        className="bg-blue-100 text-blue-800"
+                      >
+                        {scenarios.find((s) => s.id === activeScenario)?.impact}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-blue-700">
+                      영향지역:{" "}
+                      {scenarios
+                        .find((s) => s.id === activeScenario)
+                        ?.affected.join(", ")}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -356,65 +401,6 @@ const GrowthScan = () => {
           <div className="lg:col-span-2 space-y-6">
             {/* 지도와 시나리오 컨테이너 */}
             <div className="relative">
-              {/* 시나리오 선택 드롭박스 - 지도 좌측에 오버레이 */}
-              <div className="absolute left-4 bottom-4 z-10 w-80">
-                <Card className="bg-white/95 backdrop-blur-sm shadow-lg">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="flex items-center text-sm">
-                      <Zap className="w-4 h-4 mr-2 text-blue-600" />
-                      시나리오 선택
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Select
-                      value={activeScenario}
-                      onValueChange={setActiveScenario}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="시나리오를 선택하세요" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {scenarios.map((scenario) => (
-                          <SelectItem key={scenario.id} value={scenario.id}>
-                            <div className="flex flex-col items-start">
-                              <span className="font-medium">
-                                {scenario.name}
-                              </span>
-                              <span className="text-xs text-gray-500">
-                                {scenario.description}
-                              </span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-
-                    {/* 선택된 시나리오 정보 표시 */}
-                    {activeScenario && (
-                      <div className="mt-3 p-3 bg-blue-50 rounded-lg">
-                        <div className="flex items-center space-x-2 mb-2">
-                          <Badge
-                            variant="secondary"
-                            className="bg-blue-100 text-blue-800"
-                          >
-                            {
-                              scenarios.find((s) => s.id === activeScenario)
-                                ?.impact
-                            }
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-blue-700">
-                          영향지역:{" "}
-                          {scenarios
-                            .find((s) => s.id === activeScenario)
-                            ?.affected.join(", ")}
-                        </p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-
               {/* 지도 */}
               <MapHeatmap
                 data={mockGrowthData.map((region) => ({
