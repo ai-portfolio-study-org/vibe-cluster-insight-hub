@@ -356,8 +356,8 @@ const GrowthScan = () => {
           <div className="lg:col-span-2 space-y-6">
             {/* 지도와 시나리오 컨테이너 */}
             <div className="relative">
-              {/* 시나리오 선택 카드 - 지도 좌측에 오버레이 */}
-              <div className="absolute left-4 top-4 z-10 w-80">
+              {/* 시나리오 선택 드롭박스 - 지도 좌측에 오버레이 */}
+              <div className="absolute left-4 bottom-4 z-10 w-80">
                 <Card className="bg-white/95 backdrop-blur-sm shadow-lg">
                   <CardHeader className="pb-2">
                     <CardTitle className="flex items-center text-sm">
@@ -365,59 +365,52 @@ const GrowthScan = () => {
                       시나리오 선택
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-3">
-                    {scenarios.map((scenario) => (
-                      <div
-                        key={scenario.id}
-                        className={`p-3 rounded-lg border cursor-pointer transition-all ${
-                          activeScenario === scenario.id
-                            ? "border-blue-500 bg-blue-50"
-                            : "border-gray-200 hover:border-gray-300"
-                        }`}
-                        onClick={() => setActiveScenario(scenario.id)}
-                      >
-                        <div className="flex items-start space-x-2">
-                          <div
-                            className={`p-1.5 rounded-full ${
-                              activeScenario === scenario.id
-                                ? "bg-blue-100"
-                                : "bg-gray-100"
-                            }`}
-                          >
-                            <Zap
-                              className={`w-3 h-3 ${
-                                activeScenario === scenario.id
-                                  ? "text-blue-600"
-                                  : "text-gray-600"
-                              }`}
-                            />
-                          </div>
-                          <div className="flex-1">
-                            <h3 className="font-medium text-sm text-gray-900">
-                              {scenario.name}
-                            </h3>
-                            <p className="text-xs text-gray-600 mt-0.5">
-                              {scenario.description}
-                            </p>
-                            <div className="flex items-center space-x-2 mt-1.5">
-                              <Badge
-                                variant="secondary"
-                                className={`text-xs ${
-                                  activeScenario === scenario.id
-                                    ? "bg-blue-100 text-blue-800"
-                                    : "bg-gray-100 text-gray-800"
-                                }`}
-                              >
-                                {scenario.impact}
-                              </Badge>
+                  <CardContent>
+                    <Select
+                      value={activeScenario}
+                      onValueChange={setActiveScenario}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="시나리오를 선택하세요" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {scenarios.map((scenario) => (
+                          <SelectItem key={scenario.id} value={scenario.id}>
+                            <div className="flex flex-col items-start">
+                              <span className="font-medium">
+                                {scenario.name}
+                              </span>
                               <span className="text-xs text-gray-500">
-                                {scenario.affected.join(", ")}
+                                {scenario.description}
                               </span>
                             </div>
-                          </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    {/* 선택된 시나리오 정보 표시 */}
+                    {activeScenario && (
+                      <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <Badge
+                            variant="secondary"
+                            className="bg-blue-100 text-blue-800"
+                          >
+                            {
+                              scenarios.find((s) => s.id === activeScenario)
+                                ?.impact
+                            }
+                          </Badge>
                         </div>
+                        <p className="text-xs text-blue-700">
+                          영향지역:{" "}
+                          {scenarios
+                            .find((s) => s.id === activeScenario)
+                            ?.affected.join(", ")}
+                        </p>
                       </div>
-                    ))}
+                    )}
                   </CardContent>
                 </Card>
               </div>
@@ -438,6 +431,7 @@ const GrowthScan = () => {
                     setSelectedRegion(selectedRegion);
                   }
                 }}
+                selectedIndustry={selectedIndustry}
               />
             </div>
 
