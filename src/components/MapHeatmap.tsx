@@ -2651,17 +2651,59 @@ const MapHeatmap = ({
 
   // 🔥 도로 인프라 분석 실행 함수
   const runRoadInfrastructureAnalysis = useCallback(() => {
+    // 이미 활성화된 상태라면 비활성화
+    if (showRoadAnalysis) {
+      setShowRoadAnalysis(false);
+      setRoadAnalysisResult(null);
+
+      // 도로 공사 마커 제거
+      const existingMarkers = markersRef.current.filter((marker) => {
+        return (
+          (marker as ExtendedMarker).getTitle &&
+          (marker as ExtendedMarker).getTitle().includes("도로공사")
+        );
+      });
+      existingMarkers.forEach((marker) =>
+        (marker as ExtendedMarker).setMap(null)
+      );
+      return;
+    }
+
+    // 새로운 분석 실행
     const analysis = analyzeRoadInfrastructure();
     if (analysis) {
       setRoadAnalysisResult(analysis);
       setShowRoadAnalysis(true);
       displayRoadConstructionMarkers(analysis);
     }
-  }, [analyzeRoadInfrastructure, displayRoadConstructionMarkers]);
+  }, [
+    showRoadAnalysis,
+    analyzeRoadInfrastructure,
+    displayRoadConstructionMarkers,
+  ]);
 
   // 🔥 지역별 도로 인프라 분석 실행 함수
   const runRegionalRoadAnalysis = useCallback(
     (region: string) => {
+      // 이미 활성화된 상태라면 비활성화
+      if (showRoadAnalysis) {
+        setShowRoadAnalysis(false);
+        setRoadAnalysisResult(null);
+
+        // 도로 공사 마커 제거
+        const existingMarkers = markersRef.current.filter((marker) => {
+          return (
+            (marker as ExtendedMarker).getTitle &&
+            (marker as ExtendedMarker).getTitle().includes("도로공사")
+          );
+        });
+        existingMarkers.forEach((marker) =>
+          (marker as ExtendedMarker).setMap(null)
+        );
+        return;
+      }
+
+      // 새로운 분석 실행
       const analysis = analyzeRoadInfrastructure(region);
       if (analysis) {
         setRoadAnalysisResult(analysis);
@@ -2669,7 +2711,11 @@ const MapHeatmap = ({
         displayRoadConstructionMarkers(analysis);
       }
     },
-    [analyzeRoadInfrastructure, displayRoadConstructionMarkers]
+    [
+      showRoadAnalysis,
+      analyzeRoadInfrastructure,
+      displayRoadConstructionMarkers,
+    ]
   );
 
   // 🔥 철도 데이터 로드 함수들
@@ -3105,6 +3151,27 @@ const MapHeatmap = ({
             {/* 🔥 철도 인프라 분석 버튼 */}
             <Button
               onClick={() => {
+                // 이미 활성화된 상태라면 비활성화
+                if (showRailwayAnalysis) {
+                  setShowRailwayAnalysis(false);
+                  setRailwayAnalysisResult(null);
+
+                  // 철도 마커 제거
+                  const existingMarkers = markersRef.current.filter(
+                    (marker) => {
+                      return (
+                        (marker as ExtendedMarker).getTitle &&
+                        (marker as ExtendedMarker).getTitle().includes("철도")
+                      );
+                    }
+                  );
+                  existingMarkers.forEach((marker) =>
+                    (marker as ExtendedMarker).setMap(null)
+                  );
+                  return;
+                }
+
+                // 새로운 분석 실행
                 const result = analyzeRailwayInfrastructure();
                 setRailwayAnalysisResult(result);
                 setShowRailwayAnalysis(true);
