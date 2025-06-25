@@ -10,85 +10,34 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-
-interface MapHeatmapProps {
-  data: Array<{
-    region: string;
-    lat: number;
-    lng: number;
-    score: number;
-  }>;
-  onRegionClick?: (region: string) => void;
-  selectedIndustry?: string;
-}
-
-interface CargoStation {
-  name: string;
-  lat: number;
-  lng: number;
-  type:
-    | "시멘트"
-    | "컨테이너"
-    | "석탄"
-    | "철강"
-    | "유류"
-    | "광석"
-    | "공항"
-    | "항만"
-    | "철도";
-}
-
-interface RouteData {
-  path: [number, number][];
-  distance?: number;
-  duration?: number;
-  isDetailed: boolean;
-  total_distance?: number;
-  total_duration?: number;
-  estimated_arrival_time?: string;
-  fuel_cost?: number;
-  toll_fee?: number;
-  total_cost?: number;
-  traffic_level?: string;
-  congested_areas?: string[];
-  traffic_conditions?: {
-    average_speed?: number;
-    major_roads?: string[];
-    estimated_delay?: number;
-    congestion_level?: string;
-  };
-  route_summary?: string;
-  waypoints?: Array<{
-    name: string;
-    lat: number;
-    lng: number;
-    type: "start" | "via" | "end";
-  }>;
-  route_details?: Record<string, unknown>;
-}
-
-interface RouteOption {
-  id: string;
-  name: string;
-  start: [number, number];
-  goal: [number, number];
-  vias: [number, number][];
-  description: string;
-  category: "container" | "cement" | "steel";
-}
-
-// Polyline에 routeId 속성을 추가하는 인터페이스
-interface RoutePolyline extends naver.maps.Polyline {
-  routeId?: string;
-}
-
-// 네이버 지도 Marker 확장 타입
-interface ExtendedMarker extends naver.maps.Marker {
-  getTitle(): string;
-  setMap(map: naver.maps.Map | null): void;
-  getPosition(): naver.maps.LatLng;
-  getMap(): naver.maps.Map | null;
-}
+import { useDataLoading } from "./hooks/useDataLoading";
+import { useMapInitialization } from "./hooks/useMapInitialization";
+import { useRouteManagement } from "./hooks/useRouteManagement";
+import {
+  MapHeatmapProps,
+  CargoStation,
+  RouteData,
+  RouteOption,
+  RoutePolyline,
+  ExtendedMarker,
+  RoadConstructionInfo,
+  RailwayIndustryInfo,
+  HighSpeedRailwayPlan,
+  MetropolitanRailwayInfo,
+  GeneralRailwayConstruction,
+  RailwayConstructionStatus,
+  RoadInfrastructureAnalysis,
+  RailwayInfrastructureAnalysis,
+  AirportLocationInfo,
+  AirportTransportInfo,
+  AirportFacilityInfo,
+  AirportInfrastructureAnalysis,
+  industryInfrastructureMap,
+  samplePath,
+  fetchRouteFromAPI,
+  drawRouteFromAPI,
+  parseCSV,
+} from "./MapTypes";
 
 // 경로 옵션들 정의 (카테고리별로 분류)
 const routeOptions: RouteOption[] = [
@@ -102,608 +51,6 @@ const routeCategories = {
   steel: routeOptions.filter((route) => route.category === "steel"),
 };
 
-// 업종별 물류 인프라 매핑 정의
-const industryInfrastructureMap = {
-  biotech: {
-    label: "바이오/제약",
-    requiredInfrastructure: ["공항", "철도", "컨테이너"],
-    locations: [
-      { name: "청주국제공항", lat: 36.7166, lng: 127.499, type: "공항" },
-      { name: "오송역", lat: 36.6264, lng: 127.3295, type: "철도" },
-      { name: "청주역", lat: 36.6425, lng: 127.4911, type: "철도" },
-      { name: "오봉", lat: 37.324, lng: 126.823, type: "컨테이너" },
-    ],
-  },
-  it: {
-    label: "IT/소프트웨어",
-    requiredInfrastructure: ["컨테이너", "공항", "철도"],
-    locations: [
-      { name: "오봉", lat: 37.324, lng: 126.823, type: "컨테이너" },
-      { name: "청주국제공항", lat: 36.7166, lng: 127.499, type: "공항" },
-      { name: "오송역", lat: 36.6264, lng: 127.3295, type: "철도" },
-    ],
-  },
-  semiconductor: {
-    label: "반도체/전자",
-    requiredInfrastructure: ["항만", "공항", "철도", "컨테이너"],
-    locations: [
-      { name: "부산신항", lat: 35.073, lng: 128.819, type: "항만" },
-      { name: "군산항", lat: 35.9878, lng: 126.7166, type: "항만" },
-      { name: "평택항", lat: 36.9852, lng: 126.8475, type: "항만" },
-      { name: "청주국제공항", lat: 36.7166, lng: 127.499, type: "공항" },
-      { name: "오송역", lat: 36.6264, lng: 127.3295, type: "철도" },
-      { name: "청주역", lat: 36.6425, lng: 127.4911, type: "철도" },
-      { name: "오봉", lat: 37.324, lng: 126.823, type: "컨테이너" },
-    ],
-  },
-  automotive: {
-    label: "자동차부품",
-    requiredInfrastructure: ["항만", "철도", "컨테이너"],
-    locations: [
-      { name: "부산신항", lat: 35.073, lng: 128.819, type: "항만" },
-      { name: "광양항", lat: 34.9, lng: 127.7, type: "항만" },
-      { name: "군산항", lat: 35.9878, lng: 126.7166, type: "항만" },
-      { name: "평택항", lat: 36.9852, lng: 126.8475, type: "항만" },
-      { name: "오봉", lat: 37.324, lng: 126.823, type: "컨테이너" },
-      { name: "오송역", lat: 36.6264, lng: 127.3295, type: "철도" },
-      { name: "충주역", lat: 36.9906, lng: 127.9257, type: "철도" },
-      { name: "음성역", lat: 36.9376, lng: 127.6856, type: "철도" },
-    ],
-  },
-  machinery: {
-    label: "기계/정밀",
-    requiredInfrastructure: ["철도", "항만", "컨테이너"],
-    locations: [
-      { name: "오봉", lat: 37.324, lng: 126.823, type: "컨테이너" },
-      { name: "평택항", lat: 36.9852, lng: 126.8475, type: "항만" },
-      { name: "부산신항", lat: 35.073, lng: 128.819, type: "항만" },
-      { name: "오송역", lat: 36.6264, lng: 127.3295, type: "철도" },
-      { name: "청주역", lat: 36.6425, lng: 127.4911, type: "철도" },
-    ],
-  },
-  steel: {
-    label: "철강/금속",
-    requiredInfrastructure: ["항만", "철도"],
-    locations: [
-      { name: "광양항", lat: 34.9, lng: 127.7, type: "항만" },
-      { name: "포항", lat: 36.0, lng: 129.4, type: "항만" },
-      { name: "울산", lat: 35.499, lng: 129.382, type: "항만" },
-      { name: "부산신항", lat: 35.073, lng: 128.819, type: "항만" },
-      { name: "인천", lat: 37.484, lng: 126.64, type: "항만" },
-      { name: "당진", lat: 36.911, lng: 126.785, type: "철강" },
-      { name: "오송역", lat: 36.6264, lng: 127.3295, type: "철도" },
-    ],
-  },
-  cement: {
-    label: "시멘트/건자재",
-    requiredInfrastructure: ["철도"],
-    locations: [
-      { name: "도담", lat: 36.988, lng: 128.417, type: "시멘트" },
-      { name: "입석리", lat: 37.125, lng: 128.5, type: "시멘트" },
-      { name: "쌍용", lat: 37.185, lng: 128.345, type: "시멘트" },
-      { name: "삼화", lat: 37.549, lng: 129.108, type: "시멘트" },
-      { name: "제천역", lat: 37.1361, lng: 128.1948, type: "철도" },
-      { name: "청주역", lat: 36.6425, lng: 127.4911, type: "철도" },
-      { name: "충주역", lat: 36.9906, lng: 127.9257, type: "철도" },
-    ],
-  },
-};
-
-// 경로 포인트 샘플링 함수 (10분의 1로 줄이기)
-function samplePath(
-  points: [number, number][],
-  sampleRate: number = 10
-): [number, number][] {
-  if (points.length <= 2) return points;
-
-  const sampledPoints: [number, number][] = [];
-
-  // 시작점은 항상 포함
-  sampledPoints.push(points[0]);
-
-  // 중간 포인트들을 sampleRate 간격으로 샘플링
-  for (let i = sampleRate; i < points.length - sampleRate; i += sampleRate) {
-    sampledPoints.push(points[i]);
-  }
-
-  // 끝점은 항상 포함
-  sampledPoints.push(points[points.length - 1]);
-
-  console.log(
-    `경로 샘플링: ${points.length}개 → ${sampledPoints.length}개 포인트`
-  );
-  return sampledPoints;
-}
-
-// 새로운 API 엔드포인트로 경로 데이터 가져오기
-async function fetchRouteFromAPI(
-  routeOption: RouteOption,
-  cache: { [key: string]: RouteData },
-  useDetailedAPI: boolean = false
-) {
-  // 상세 API 호출이 필요한 경우에만 실제 API 호출
-  if (useDetailedAPI) {
-    // 캐시에 상세 데이터가 있으면 사용
-    if (cache[routeOption.id] && cache[routeOption.id].isDetailed) {
-      console.log(`캐시된 상세 데이터 사용: ${routeOption.id}`);
-      return cache[routeOption.id];
-    }
-
-    try {
-      console.log(`상세 API 호출: ${routeOption.id}`);
-      const response = await fetch("http://localhost:8000/api/route", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          start: routeOption.start,
-          goal: routeOption.goal,
-          vias: routeOption.vias,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("API 호출 실패");
-      }
-
-      const apiResponse = await response.json();
-      console.log(`API 응답 구조 확인:`, apiResponse);
-
-      // API 응답 구조에 따라 경로 데이터 추출
-      let routeData: RouteData;
-
-      if (
-        apiResponse.route_details &&
-        apiResponse.route_details.route &&
-        apiResponse.route_details.route.trafast &&
-        apiResponse.route_details.route.trafast[0]
-      ) {
-        // route_details.route.trafast에서 경로 추출
-        const rawPath = apiResponse.route_details.route.trafast[0].path.map(
-          ([lng, lat]: [number, number]) => [lat, lng] as [number, number]
-        );
-
-        // 경로 샘플링 적용 (10분의 1로 줄이기)
-        const sampledPath = samplePath(rawPath, 10);
-
-        // 새로운 API 응답 정보들 추출
-        routeData = {
-          path: sampledPath,
-          isDetailed: true,
-          total_distance: apiResponse.total_distance,
-          total_duration: apiResponse.total_duration,
-          estimated_arrival_time: apiResponse.estimated_arrival_time,
-          fuel_cost: apiResponse.fuel_cost,
-          toll_fee: apiResponse.toll_fee,
-          total_cost: apiResponse.total_cost,
-          traffic_level: apiResponse.traffic_level,
-          congested_areas: apiResponse.congested_areas,
-          traffic_conditions: apiResponse.traffic_conditions,
-          route_summary: apiResponse.route_summary,
-          waypoints: apiResponse.waypoints,
-          route_details: apiResponse.route_details,
-        };
-      } else if (
-        apiResponse.route_details &&
-        apiResponse.route_details.route &&
-        apiResponse.route_details.route.traoptimal &&
-        apiResponse.route_details.route.traoptimal[0]
-      ) {
-        // route_details.route.traoptimal에서 경로 추출
-        const rawPath = apiResponse.route_details.route.traoptimal[0].path.map(
-          ([lng, lat]: [number, number]) => [lat, lng] as [number, number]
-        );
-
-        // 경로 샘플링 적용
-        const sampledPath = samplePath(rawPath, 10);
-
-        routeData = {
-          path: sampledPath,
-          isDetailed: true,
-          total_distance: apiResponse.total_distance,
-          total_duration: apiResponse.total_duration,
-          estimated_arrival_time: apiResponse.estimated_arrival_time,
-          fuel_cost: apiResponse.fuel_cost,
-          toll_fee: apiResponse.toll_fee,
-          total_cost: apiResponse.total_cost,
-          traffic_level: apiResponse.traffic_level,
-          congested_areas: apiResponse.congested_areas,
-          traffic_conditions: apiResponse.traffic_conditions,
-          route_summary: apiResponse.route_summary,
-          waypoints: apiResponse.waypoints,
-          route_details: apiResponse.route_details,
-        };
-      } else if (
-        apiResponse.route &&
-        apiResponse.route.trafast &&
-        apiResponse.route.trafast[0]
-      ) {
-        // 기존 구조 (route.trafast)
-        const rawPath = apiResponse.route.trafast[0].path.map(
-          ([lng, lat]: [number, number]) => [lat, lng] as [number, number]
-        );
-
-        const sampledPath = samplePath(rawPath, 10);
-
-        routeData = {
-          path: sampledPath,
-          isDetailed: true,
-          total_distance: apiResponse.total_distance,
-          total_duration: apiResponse.total_duration,
-          estimated_arrival_time: apiResponse.estimated_arrival_time,
-          fuel_cost: apiResponse.fuel_cost,
-          toll_fee: apiResponse.toll_fee,
-          total_cost: apiResponse.total_cost,
-          traffic_level: apiResponse.traffic_level,
-          congested_areas: apiResponse.congested_areas,
-          traffic_conditions: apiResponse.traffic_conditions,
-          route_summary: apiResponse.route_summary,
-          waypoints: apiResponse.waypoints,
-          route_details: apiResponse.route_details,
-        };
-      } else if (
-        apiResponse.route &&
-        apiResponse.route.traoptimal &&
-        apiResponse.route.traoptimal[0]
-      ) {
-        // 기존 구조 (route.traoptimal)
-        const rawPath = apiResponse.route.traoptimal[0].path.map(
-          ([lng, lat]: [number, number]) => [lat, lng] as [number, number]
-        );
-
-        const sampledPath = samplePath(rawPath, 10);
-
-        routeData = {
-          path: sampledPath,
-          isDetailed: true,
-          total_distance: apiResponse.total_distance,
-          total_duration: apiResponse.total_duration,
-          estimated_arrival_time: apiResponse.estimated_arrival_time,
-          fuel_cost: apiResponse.fuel_cost,
-          toll_fee: apiResponse.toll_fee,
-          total_cost: apiResponse.total_cost,
-          traffic_level: apiResponse.traffic_level,
-          congested_areas: apiResponse.congested_areas,
-          traffic_conditions: apiResponse.traffic_conditions,
-          route_summary: apiResponse.route_summary,
-          waypoints: apiResponse.waypoints,
-          route_details: apiResponse.route_details,
-        };
-      } else if (apiResponse.path) {
-        // 직접 path가 있는 경우
-        const sampledPath = samplePath(apiResponse.path, 10);
-        routeData = {
-          path: sampledPath,
-          isDetailed: true,
-          total_distance: apiResponse.total_distance,
-          total_duration: apiResponse.total_duration,
-          estimated_arrival_time: apiResponse.estimated_arrival_time,
-          fuel_cost: apiResponse.fuel_cost,
-          toll_fee: apiResponse.toll_fee,
-          total_cost: apiResponse.total_cost,
-          traffic_level: apiResponse.traffic_level,
-          congested_areas: apiResponse.congested_areas,
-          traffic_conditions: apiResponse.traffic_conditions,
-          route_summary: apiResponse.route_summary,
-          waypoints: apiResponse.waypoints,
-          route_details: apiResponse.route_details,
-        };
-      } else {
-        // 기본 mock 데이터 사용
-        console.warn(
-          `경로 데이터를 찾을 수 없어 mock 데이터 사용: ${routeOption.id}`
-        );
-        routeData = {
-          path: [routeOption.start, ...routeOption.vias, routeOption.goal] as [
-            number,
-            number
-          ][],
-          isDetailed: true,
-        };
-      }
-
-      console.log(`추출된 상세 경로 데이터:`, routeData);
-      return routeData;
-    } catch (error) {
-      console.error("경로 데이터 가져오기 실패:", error);
-      // 에러 시 mock 데이터 사용
-      const mockRouteData: RouteData = {
-        path: [routeOption.start, ...routeOption.vias, routeOption.goal] as [
-          number,
-          number
-        ][],
-        isDetailed: true,
-      };
-      return mockRouteData;
-    }
-  } else {
-    // 초기 표시용 mock 데이터 (3개 포인트)
-    console.log(`Mock 데이터 사용: ${routeOption.id}`);
-    const mockRouteData: RouteData = {
-      path: [routeOption.start, ...routeOption.vias, routeOption.goal] as [
-        number,
-        number
-      ][],
-      isDetailed: false,
-    };
-    return mockRouteData;
-  }
-}
-
-const DIRECTIONS_BASE =
-  "https://naveropenapi.apigw.ntruss.com/map-direction/v1/driving";
-
-async function fetchRoute({
-  start,
-  goal,
-  vias = [],
-}: {
-  start: [number, number];
-  goal: [number, number];
-  vias?: [number, number][];
-}) {
-  const coords = [
-    `start=${start[1]},${start[0]}`,
-    ...vias.map((v, i) => `via=${v[1]},${v[0]}`),
-    `goal=${goal[1]},${goal[0]}`,
-  ].join("&");
-  const url = `${DIRECTIONS_BASE}/15?${coords}&option=trafast`; // 최대 15 via
-  const res = await fetch(url, {
-    headers: {
-      "X-NCP-APIGW-API-KEY-ID": import.meta.env.VITE_NAVER_MAP_API_KEY_ID,
-      "X-NCP-APIGW-API-KEY": import.meta.env.VITE_NAVER_CLIENT_SECRET,
-    },
-  });
-  return res.json();
-}
-
-function drawRoute(map, routeJson) {
-  const coords = routeJson.route.traoptimal[0].path.map(
-    ([lng, lat]) => new window.naver.maps.LatLng(lat, lng)
-  );
-  return new window.naver.maps.Polyline({
-    map,
-    path: coords,
-    strokeColor: "#10B981",
-    strokeOpacity: 0.7,
-    strokeWeight: 5,
-  });
-}
-
-// 새로운 API 데이터로 경로 그리기
-function drawRouteFromAPI(
-  map: naver.maps.Map,
-  routeData: RouteData,
-  color: string,
-  routeOption?: RouteOption,
-  onRouteClick?: (route: RouteOption, data: RouteData) => void
-): RoutePolyline | null {
-  if (!routeData?.path) {
-    console.error("경로 데이터가 없습니다:", routeData);
-    return null;
-  }
-
-  console.log(
-    `경로 그리기 시작: ${routeOption?.id}, 포인트 수: ${routeData.path.length}`
-  );
-
-  const coords = routeData.path.map(
-    ([lat, lng]) => new window.naver.maps.LatLng(lat, lng)
-  );
-
-  console.log(`좌표 변환 완료: ${coords.length}개 포인트`);
-
-  // 경로 포인트에 마커 추가 (시작점, 끝점, 경유점만)
-  if (routeOption) {
-    // 시작점 마커
-    const startCoord = routeData.path[0];
-    const startPosition = new window.naver.maps.LatLng(
-      startCoord[0],
-      startCoord[1]
-    );
-    new window.naver.maps.Marker({
-      position: startPosition,
-      map,
-      title: "시작",
-      icon: {
-        content: `<div style="
-          width: 12px;
-          height: 12px;
-          border-radius: 50%;
-          background-color: #4CAF50;
-          border: 2px solid white;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-        "></div>`,
-        size: new window.naver.maps.Size(12, 12),
-        anchor: new window.naver.maps.Point(6, 6),
-      },
-    });
-
-    // 경유점 마커들
-    if (routeOption.vias && routeOption.vias.length > 0) {
-      routeOption.vias.forEach((via, index) => {
-        const viaPosition = new window.naver.maps.LatLng(via[0], via[1]);
-        new window.naver.maps.Marker({
-          position: viaPosition,
-          map,
-          title: `경유${index + 1}`,
-          icon: {
-            content: `<div style="
-              width: 12px;
-              height: 12px;
-              border-radius: 50%;
-              background-color: #FF9800;
-              border: 2px solid white;
-              box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-            "></div>`,
-            size: new window.naver.maps.Size(12, 12),
-            anchor: new window.naver.maps.Point(6, 6),
-          },
-        });
-      });
-    }
-
-    // 끝점 마커
-    const endCoord = routeData.path[routeData.path.length - 1];
-    const endPosition = new window.naver.maps.LatLng(endCoord[0], endCoord[1]);
-    new window.naver.maps.Marker({
-      position: endPosition,
-      map,
-      title: "도착",
-      icon: {
-        content: `<div style="
-          width: 12px;
-          height: 12px;
-          border-radius: 50%;
-          background-color: #F44336;
-          border: 2px solid white;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-        "></div>`,
-        size: new window.naver.maps.Size(12, 12),
-        anchor: new window.naver.maps.Point(6, 6),
-      },
-    });
-  }
-
-  const polyline = new window.naver.maps.Polyline({
-    map,
-    path: coords,
-    strokeColor: color,
-    strokeOpacity: 0.8,
-    strokeWeight: 4,
-    strokeStyle: "solid",
-    clickable: true, // 클릭 가능하도록 설정
-  });
-
-  console.log(`경로 그리기 완료: ${routeOption?.id}, 색상: ${color}`);
-
-  // 경로에 고유 식별자 추가
-  if (routeOption) {
-    (polyline as RoutePolyline).routeId = routeOption.id;
-  }
-
-  // 경로 클릭 이벤트 추가
-  if (routeOption && onRouteClick) {
-    window.naver.maps.Event.addListener(polyline, "click", () => {
-      onRouteClick(routeOption, routeData);
-    });
-  }
-
-  return polyline as RoutePolyline;
-}
-
-// 🔥 도로 공사정보 인터페이스 추가
-interface RoadConstructionInfo {
-  발주청: string;
-  공사명: string;
-  공사구분: string;
-  주요사업지: string;
-  사업개요: string;
-  노선명: string;
-  공사위치: string;
-  시공사: string;
-  현장주소: string;
-  시작일: string;
-  준공일: string;
-  "도급액(원)": string;
-}
-
-// 🔥 철도 관련 타입들
-interface RailwayIndustryInfo {
-  발주청: string;
-  사업명: string;
-  사업개요: string;
-  추진경위: string;
-  사업시작일: string;
-  화물여부: string;
-  투자금액: string;
-}
-
-interface HighSpeedRailwayPlan {
-  사업명: string;
-  사업구간: string;
-  사업내용: string;
-  연장: string;
-  추진단계: string;
-}
-
-interface MetropolitanRailwayInfo {
-  사업명: string;
-  사업구간: string;
-  사업내용: string;
-  연장: string;
-  추진단계: string;
-}
-
-interface GeneralRailwayConstruction {
-  노선명: string;
-  사업구간: string;
-  사업내용: string;
-  연장: string;
-  착공일: string;
-  완공일: string;
-}
-
-interface RailwayConstructionStatus {
-  사업명: string;
-  연장: string;
-  착공일: string;
-  완공일: string;
-  진행률: string;
-  사업단계: string;
-}
-
-// 🔥 도로 인프라 연계성 분석 결과 인터페이스
-interface RoadInfrastructureAnalysis {
-  constructionCount: number;
-  totalBudget: number;
-  completionRate: number;
-  regionalDistribution: { [region: string]: number };
-  constructionTypes: { [type: string]: number };
-  timelineAnalysis: {
-    ongoing: number;
-    completed: number;
-    planned: number;
-  };
-  impactScore: number;
-  recommendations: string[];
-}
-
-// 🔥 철도 인프라 연계성 분석 결과 인터페이스
-interface RailwayInfrastructureAnalysis {
-  totalProjects: number;
-  totalLength: number;
-  highSpeedRailways: number;
-  metropolitanRailways: number;
-  generalRailways: number;
-  freightRailways: number;
-  regionalDistribution: { [region: string]: number };
-  completionRate: number;
-  connectivityScore: number;
-  recommendations: string[];
-}
-
-// CSV 파싱 헬퍼 함수
-const parseCSV = <T,>(csvText: string): T[] => {
-  const lines = csvText.split("\n");
-  const headers = lines[0].split(",");
-  const data: T[] = [];
-
-  for (let i = 1; i < lines.length; i++) {
-    if (lines[i].trim()) {
-      const values = lines[i].split(",");
-      const row: Record<string, string> = {};
-      headers.forEach((header, index) => {
-        row[header.trim()] = values[index]?.trim() || "";
-      });
-      data.push(row as unknown as T);
-    }
-  }
-
-  return data;
-};
-
 const MapHeatmap = ({
   data,
   onRegionClick,
@@ -712,877 +59,111 @@ const MapHeatmap = ({
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<naver.maps.Map | null>(null);
   const markersRef = useRef<naver.maps.Marker[]>([]);
-  const [isLoadingRoute, setIsLoadingRoute] = useState(false);
 
-  const loadRoadConstructionData = useCallback(async () => {
-    setIsLoadingRoadData(true);
-    try {
-      const response = await fetch(
-        "/vibe-cluster-insight-hub/road_construction_info.csv"
-      );
-      const csvText = await response.text();
-
-      // CSV 파싱
-      const lines = csvText.split("\n");
-      const headers = lines[0].split(",");
-      const data: RoadConstructionInfo[] = [];
-
-      for (let i = 1; i < lines.length; i++) {
-        if (lines[i].trim()) {
-          const values = lines[i].split(",");
-          const row: Record<string, string> = {};
-          headers.forEach((header, index) => {
-            row[header.trim()] = values[index]?.trim() || "";
-          });
-          data.push(row as unknown as RoadConstructionInfo);
-        }
-      }
-
-      setRoadConstructionData(data);
-      console.log("도로 공사정보 로드 완료:", data.length, "건");
-    } catch (error) {
-      console.error("도로 공사정보 로드 실패:", error);
-    } finally {
-      setIsLoadingRoadData(false);
-    }
-  }, []);
-
-  const [routePolylines, setRoutePolylines] = useState<RoutePolyline[]>([]);
-  const [selectedRoute, setSelectedRoute] = useState<RouteOption>(
-    routeOptions[0]
-  );
-  const [selectedCategory, setSelectedCategory] = useState<
-    "container" | "cement" | "steel" | null
+  // 인프라 필터링 관련 상태들
+  const [currentIndustryInfo, setCurrentIndustryInfo] = useState<
+    | (typeof industryInfrastructureMap)[keyof typeof industryInfrastructureMap]
+    | null
   >(null);
-  const [clickedRouteData, setClickedRouteData] = useState<{
-    route: RouteOption;
-    data: RouteData;
-  } | null>(null);
-  const [currentRedRouteId, setCurrentRedRouteId] = useState<string | null>(
-    null
-  );
-  const [routeDataCache, setRouteDataCache] = useState<{
-    [key: string]: RouteData;
-  }>({});
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
-  const [highlightedRoute, setHighlightedRoute] =
-    useState<RoutePolyline | null>(null);
-
-  // 🔥 필터링 관련 상태 추가
+  const [selectedInfrastructureTypes, setSelectedInfrastructureTypes] =
+    useState<string[]>([]);
+  const [showInfrastructureFilter, setShowInfrastructureFilter] =
+    useState(false);
   const [filteredMarkers, setFilteredMarkers] = useState<naver.maps.Marker[]>(
     []
   );
-  const [showInfrastructureFilter, setShowInfrastructureFilter] =
-    useState(false);
-  const [selectedInfrastructureTypes, setSelectedInfrastructureTypes] =
-    useState<string[]>([]);
-  const [currentIndustryInfo, setCurrentIndustryInfo] = useState<{
-    label: string;
-    requiredInfrastructure: string[];
-    locations: Array<{
-      name: string;
-      lat: number;
-      lng: number;
-      type: string;
-    }>;
-  } | null>(null);
 
-  // 🔥 커스텀 경로 관련 상태 추가
-  const [customStart, setCustomStart] = useState<[number, number] | null>(null);
-  const [customGoal, setCustomGoal] = useState<[number, number] | null>(null);
-  const [customStartMarker, setCustomStartMarker] =
-    useState<naver.maps.Marker | null>(null);
-  const [customGoalMarker, setCustomGoalMarker] =
-    useState<naver.maps.Marker | null>(null);
+  // useDataLoading 훅 사용
+  const {
+    loadRoadConstructionData,
+    loadRailwayData,
+    loadAirportData,
+    showRoadAnalysis,
+    setShowRoadAnalysis,
+    showRailwayAnalysis,
+    setShowRailwayAnalysis,
+    showAirportAnalysis,
+    setShowAirportAnalysis,
+    roadAnalysisResult,
+    setRoadAnalysisResult,
+    railwayAnalysisResult,
+    setRailwayAnalysisResult,
+    airportAnalysisResult,
+    setAirportAnalysisResult,
+    isLoadingRoadData,
+    isLoadingRailwayData,
+    isLoadingAirportData,
+    // 데이터 추가
+    roadConstructionData,
+    railwayIndustryData,
+    highSpeedRailwayData,
+    metropolitanRailwayData,
+    generalRailwayData,
+    railwayConstructionData,
+  } = useDataLoading();
 
-  // 🔥 도로 인프라 분석 관련 상태 추가
-  const [roadConstructionData, setRoadConstructionData] = useState<
-    RoadConstructionInfo[]
-  >([]);
-  const [roadAnalysisResult, setRoadAnalysisResult] =
-    useState<RoadInfrastructureAnalysis | null>(null);
-  const [showRoadAnalysis, setShowRoadAnalysis] = useState(false);
-  const [isLoadingRoadData, setIsLoadingRoadData] = useState(false);
+  // useRouteManagement 훅 사용
+  const {
+    drawCustomRoute,
+    handleShowCategoryRoutes,
+    handleShowRoute,
+    handleRouteClick,
+    removeRedRoutesAsync,
+    resetCustomRoute,
+    highlightedRoute,
+    setHighlightedRoute,
+    customStart,
+    setCustomStart,
+    customGoal,
+    setCustomGoal,
+    customStartMarker,
+    setCustomStartMarker,
+    customGoalMarker,
+    setCustomGoalMarker,
+    selectedCategory,
+    setSelectedCategory,
+    routePolylines,
+    setRoutePolylines,
+    selectedRoute,
+    setSelectedRoute,
+    clickedRouteData,
+    setClickedRouteData,
+    currentRedRouteId,
+    setCurrentRedRouteId,
+    routeDataCache,
+    setRouteDataCache,
+    isInitialLoad,
+    setIsInitialLoad,
+    isLoadingRoute,
+    setIsLoadingRoute,
+    customStartRef,
+    customGoalRef,
+  } = useRouteManagement({
+    mapInstance,
+    routeCategories,
+  });
 
-  // 🔥 useRef로 최신 상태 값 추적
-  const customStartRef = useRef<[number, number] | null>(null);
-  const customGoalRef = useRef<[number, number] | null>(null);
+  // useMapInitialization 훅 사용
+  const { initializeMap } = useMapInitialization({
+    mapRef,
+    mapInstance,
+    markersRef,
+    data,
+    onRegionClick,
+    selectedIndustry,
+    setCustomStart,
+    setCustomGoal,
+    setCustomStartMarker,
+    setCustomGoalMarker,
+    customStartRef,
+    customGoalRef,
+    drawCustomRoute,
+    highlightedRoute,
+    setHighlightedRoute,
+    setSelectedCategory,
+    handleShowCategoryRoutes,
+  });
 
-  // 🔥 철도 관련 상태들
-  const [railwayIndustryData, setRailwayIndustryData] = useState<
-    RailwayIndustryInfo[]
-  >([]);
-  const [highSpeedRailwayData, setHighSpeedRailwayData] = useState<
-    HighSpeedRailwayPlan[]
-  >([]);
-  const [metropolitanRailwayData, setMetropolitanRailwayData] = useState<
-    MetropolitanRailwayInfo[]
-  >([]);
-  const [generalRailwayData, setGeneralRailwayData] = useState<
-    GeneralRailwayConstruction[]
-  >([]);
-  const [railwayConstructionData, setRailwayConstructionData] = useState<
-    RailwayConstructionStatus[]
-  >([]);
-  const [isLoadingRailwayData, setIsLoadingRailwayData] = useState(false);
-
-  // 🔥 철도 분석 관련 상태
-  const [showRailwayAnalysis, setShowRailwayAnalysis] = useState(false);
-  const [railwayAnalysisResult, setRailwayAnalysisResult] =
-    useState<RailwayInfrastructureAnalysis | null>(null);
-
-  useEffect(() => {
-    customStartRef.current = customStart;
-  }, [customStart]);
-
-  useEffect(() => {
-    customGoalRef.current = customGoal;
-  }, [customGoal]);
-
-  // 🔥 커스텀 경로 그리기 함수
-  const drawCustomRoute = useCallback(
-    async (start: [number, number], goal: [number, number]) => {
-      if (!mapInstance.current) return;
-
-      const routeOption: RouteOption = {
-        id: "user-custom-route",
-        name: "사용자 경로",
-        start,
-        goal,
-        vias: [],
-        description: "직접 선택한 경로",
-        category: "container",
-      };
-
-      try {
-        // 기존 경로 제거
-        if (highlightedRoute) {
-          highlightedRoute.setMap(null);
-        }
-
-        const result = await fetchRouteFromAPI(routeOption, {}, true);
-        if (!result || !result.path || result.path.length < 2) {
-          console.warn("유효하지 않은 경로 데이터:", result);
-          return;
-        }
-
-        // 상세 경로 정보를 clickedRouteData에 저장
-        setClickedRouteData({
-          route: routeOption,
-          data: result,
-        });
-
-        const newRoute = drawRouteFromAPI(
-          mapInstance.current,
-          result,
-          "#FF6B6B",
-          routeOption
-        );
-
-        if (newRoute) {
-          setHighlightedRoute(newRoute);
-        }
-      } catch (error) {
-        console.error("커스텀 경로 요청 실패:", error);
-      }
-    },
-    [highlightedRoute]
-  );
-
-  const initializeMap = useCallback(() => {
-    if (!mapRef.current || !window.naver?.maps) return;
-
-    const center = new window.naver.maps.LatLng(36.6351, 127.4914);
-    const map = new window.naver.maps.Map(mapRef.current, {
-      center,
-      zoom: 8,
-      zoomControl: true,
-      zoomControlOptions: {
-        position: window.naver.maps.Position.TOP_RIGHT,
-      },
-    });
-
-    const getColorByCargoType = (type: string) => {
-      switch (type) {
-        case "시멘트":
-          return "#6B7280"; // 회색
-        case "컨테이너":
-          return "#3B82F6"; // 파랑
-        case "석탄":
-          return "#1F2937"; // 진회색
-        case "철강":
-          return "#EF4444"; // 빨강
-        case "유류":
-          return "#F59E0B"; // 주황
-        case "광석":
-          return "#10B981"; // 초록
-        case "공항":
-          return "#8B5CF6"; // 보라
-        case "항만":
-          return "#06B6D4"; // 청록
-        case "철도":
-          return "#F97316"; // 주황
-        default:
-          return "#9CA3AF";
-      }
-    };
-
-    const getColorByScore = (score: number) => {
-      if (score >= 8.0) return "#ef4444";
-      if (score >= 6.0) return "#eab308";
-      return "#3b82f6";
-    };
-
-    mapInstance.current = map;
-    const cargoStations: CargoStation[] = [
-      { name: "도담", lat: 36.988, lng: 128.417, type: "시멘트" },
-      { name: "입석리", lat: 37.125, lng: 128.5, type: "시멘트" },
-      { name: "쌍용", lat: 37.185, lng: 128.345, type: "시멘트" },
-      { name: "삼화", lat: 37.549, lng: 129.108, type: "시멘트" },
-      { name: "오봉", lat: 37.324, lng: 126.823, type: "컨테이너" },
-      { name: "부산신항", lat: 35.073, lng: 128.819, type: "컨테이너" },
-
-      // 🔽 추가된 공항
-      { name: "청주국제공항", lat: 36.7166, lng: 127.499, type: "공항" },
-
-      // 🔽 추가된 항만
-      { name: "평택항", lat: 36.9852, lng: 126.8475, type: "항만" },
-      { name: "군산항", lat: 35.9878, lng: 126.7166, type: "항만" },
-
-      // 🔽 추가된 철도역
-      { name: "오송역", lat: 36.6264, lng: 127.3295, type: "철도" },
-      { name: "청주역", lat: 36.6425, lng: 127.4911, type: "철도" },
-      { name: "제천역", lat: 37.1361, lng: 128.1948, type: "철도" },
-      { name: "충주역", lat: 36.9906, lng: 127.9257, type: "철도" },
-      { name: "음성역", lat: 36.9376, lng: 127.6856, type: "철도" },
-    ];
-
-    const hubs = [
-      { region: "부산항", lat: 35.1, lng: 129.1, label: "부산항" },
-      { region: "광양항", lat: 34.9, lng: 127.7, label: "광양항" },
-      { region: "포항", lat: 36.0, lng: 129.4, label: "포항" },
-    ];
-
-    // 🔥 업종별 cargoStations와 hubs 필터링
-    const getFilteredCargoStations = () => {
-      if (!selectedIndustry) return cargoStations;
-
-      const industryKey =
-        selectedIndustry as keyof typeof industryInfrastructureMap;
-      const industryInfo = industryInfrastructureMap[industryKey];
-      if (!industryInfo) return cargoStations;
-
-      // 업종별 locations에 있는 마커들만 필터링
-      const requiredLocationNames = industryInfo.locations.map(
-        (location) => location.name
-      );
-
-      return cargoStations.filter((station) =>
-        requiredLocationNames.some(
-          (name) => station.name.includes(name) || name.includes(station.name)
-        )
-      );
-    };
-
-    const getFilteredHubs = () => {
-      if (!selectedIndustry) return hubs;
-
-      const industryKey =
-        selectedIndustry as keyof typeof industryInfrastructureMap;
-      const industryInfo = industryInfrastructureMap[industryKey];
-      if (!industryInfo) return hubs;
-
-      // 업종별 관련 hubs만 필터링
-      const relevantHubNames = industryInfo.locations
-        .filter((location) => location.type === "항만")
-        .map((location) => location.name);
-
-      return hubs.filter((hub) =>
-        relevantHubNames.some(
-          (name) => hub.label.includes(name) || name.includes(hub.label)
-        )
-      );
-    };
-
-    const filteredCargoStations = getFilteredCargoStations();
-    const filteredHubs = getFilteredHubs();
-
-    // 필터링된 hubs 표시
-    filteredHubs.forEach((hub) => {
-      const marker = new window.naver.maps.Marker({
-        position: new window.naver.maps.LatLng(hub.lat, hub.lng),
-        map: map,
-        title: hub.label,
-        icon: {
-          content: `<div style="background:#000;color:#fff;padding:4px 8px;border-radius:6px;">${hub.label}</div>`,
-          size: new window.naver.maps.Size(12, 12),
-          anchor: new window.naver.maps.Point(12, 12),
-        },
-      });
-
-      // 🔥 hubs 마커 클릭 시 출발지/도착지 설정 (cargoStations와 동일)
-      window.naver.maps.Event.addListener(marker, "click", () => {
-        const coord: [number, number] = [hub.lat, hub.lng];
-        const start = customStartRef.current;
-        const goal = customGoalRef.current;
-
-        if (!start && !goal) {
-          setCustomStart(coord);
-          const startMarker = new window.naver.maps.Marker({
-            position: new window.naver.maps.LatLng(hub.lat, hub.lng),
-            map: map,
-            title: `출발지: ${hub.label}`,
-            icon: {
-              content: `<div style="background: #4CAF50; color: white; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">🚀 출발지</div>`,
-              size: new window.naver.maps.Size(12, 12),
-              anchor: new window.naver.maps.Point(12, 12),
-            },
-          });
-          setCustomStartMarker(startMarker);
-        } else if (start && !goal) {
-          setCustomGoal(coord);
-          const goalMarker = new window.naver.maps.Marker({
-            position: new window.naver.maps.LatLng(hub.lat, hub.lng),
-            map: map,
-            title: `도착지: ${hub.label}`,
-            icon: {
-              content: `<div style="background: #F44336; color: white; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">🎯 도착지</div>`,
-              size: new window.naver.maps.Size(12, 12),
-              anchor: new window.naver.maps.Point(12, 12),
-            },
-          });
-          setCustomGoalMarker(goalMarker);
-          drawCustomRoute(start, coord);
-        } else if (!start && goal) {
-          setCustomStart(coord);
-          const startMarker = new window.naver.maps.Marker({
-            position: new window.naver.maps.LatLng(hub.lat, hub.lng),
-            map: map,
-            title: `출발지: ${hub.label}`,
-            icon: {
-              content: `<div style="background: #4CAF50; color: white; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">🚀 출발지</div>`,
-              size: new window.naver.maps.Size(12, 12),
-              anchor: new window.naver.maps.Point(12, 12),
-            },
-          });
-          setCustomStartMarker(startMarker);
-          drawCustomRoute(coord, goal);
-        } else {
-          const isStart = window.confirm(
-            `"${hub.label}"을(를) 어떻게 설정하시겠습니까?\n\n확인: 출발지로 변경\n취소: 도착지로 변경`
-          );
-          if (isStart) {
-            if (customStartMarker) {
-              (
-                customStartMarker as naver.maps.Marker & {
-                  setMap: (map: naver.maps.Map | null) => void;
-                }
-              ).setMap(null);
-            }
-            setCustomStart(coord);
-            const startMarker = new window.naver.maps.Marker({
-              position: new window.naver.maps.LatLng(hub.lat, hub.lng),
-              map: map,
-              title: `출발지: ${hub.label}`,
-              icon: {
-                content: `<div style="background: #4CAF50; color: white; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">🚀 출발지</div>`,
-                size: new window.naver.maps.Size(12, 12),
-                anchor: new window.naver.maps.Point(12, 12),
-              },
-            });
-            setCustomStartMarker(startMarker);
-            drawCustomRoute(coord, goal);
-          } else {
-            if (customGoalMarker) {
-              (
-                customGoalMarker as naver.maps.Marker & {
-                  setMap: (map: naver.maps.Map | null) => void;
-                }
-              ).setMap(null);
-            }
-            setCustomGoal(coord);
-            const goalMarker = new window.naver.maps.Marker({
-              position: new window.naver.maps.LatLng(hub.lat, hub.lng),
-              map: map,
-              title: `도착지: ${hub.label}`,
-              icon: {
-                content: `<div style="background: #F44336; color: white; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">🎯 도착지</div>`,
-                size: new window.naver.maps.Size(12, 12),
-                anchor: new window.naver.maps.Point(12, 12),
-              },
-            });
-            setCustomGoalMarker(goalMarker);
-            drawCustomRoute(start, coord);
-          }
-        }
-      });
-    });
-
-    // 히트맵 마커 생성
-    data.forEach((item) => {
-      const marker = new window.naver.maps.Marker({
-        position: new window.naver.maps.LatLng(item.lat, item.lng),
-        map,
-        icon: {
-          content: `<div class="heatmap-marker" style="
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            background-color: ${getColorByScore(item.score)};
-            opacity: 0.7;
-            border: 2px solid white;
-            box-shadow: 0 0 10px rgba(0,0,0,0.3);
-          "></div>`,
-          size: new window.naver.maps.Size(20, 20),
-          anchor: new window.naver.maps.Point(10, 10),
-        },
-      });
-
-      // 🔥 마커 클릭 시 출발지/도착지 설정 (개선된 버전)
-      window.naver.maps.Event.addListener(marker, "click", () => {
-        const coord: [number, number] = [item.lat, item.lng];
-
-        const start = customStartRef.current;
-        const goal = customGoalRef.current;
-
-        if (!start && !goal) {
-          // 첫 번째 클릭: 출발지 설정
-          setCustomStart(coord);
-          const startMarker = new window.naver.maps.Marker({
-            position: new window.naver.maps.LatLng(item.lat, item.lng),
-            map: map,
-            title: `출발지: ${item.region}`,
-            icon: {
-              content: `<div style="
-                background: #4CAF50;
-                color: white;
-                padding: 4px 8px;
-                border-radius: 6px;
-                font-size: 12px;
-                font-weight: bold;
-                border: 2px solid white;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-              ">🚀 출발지</div>`,
-              size: new window.naver.maps.Size(12, 12),
-              anchor: new window.naver.maps.Point(12, 12),
-            },
-          });
-          setCustomStartMarker(startMarker);
-        } else if (start && !goal) {
-          // 두 번째 클릭: 도착지 설정 및 경로 그리기
-          setCustomGoal(coord);
-          const goalMarker = new window.naver.maps.Marker({
-            position: new window.naver.maps.LatLng(item.lat, item.lng),
-            map: map,
-            title: `도착지: ${item.region}`,
-            icon: {
-              content: `<div style="
-                background: #F44336;
-                color: white;
-                padding: 4px 8px;
-                border-radius: 6px;
-                font-size: 12px;
-                font-weight: bold;
-                border: 2px solid white;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-              ">🎯 도착지</div>`,
-              size: new window.naver.maps.Size(12, 12),
-              anchor: new window.naver.maps.Point(12, 12),
-            },
-          });
-          setCustomGoalMarker(goalMarker);
-
-          // 즉시 경로 그리기
-          drawCustomRoute(start, coord);
-        } else if (!start && goal) {
-          // 도착지만 있는 경우: 출발지 설정 및 경로 그리기
-          setCustomStart(coord);
-          const startMarker = new window.naver.maps.Marker({
-            position: new window.naver.maps.LatLng(item.lat, item.lng),
-            map: map,
-            title: `출발지: ${item.region}`,
-            icon: {
-              content: `<div style="
-                background: #4CAF50;
-                color: white;
-                padding: 4px 8px;
-                border-radius: 6px;
-                font-size: 12px;
-                font-weight: bold;
-                border: 2px solid white;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-              ">🚀 출발지</div>`,
-              size: new window.naver.maps.Size(12, 12),
-              anchor: new window.naver.maps.Point(12, 12),
-            },
-          });
-          setCustomStartMarker(startMarker);
-
-          // 즉시 경로 그리기
-          drawCustomRoute(coord, goal);
-        } else {
-          // 출발지와 도착지가 모두 있는 경우: 선택 옵션 제공
-          const isStart = window.confirm(
-            `"${item.region}"을(를) 어떻게 설정하시겠습니다?\n\n확인: 출발지로 변경\n취소: 도착지로 변경`
-          );
-
-          if (isStart) {
-            // 출발지로 변경
-            if (customStartMarker) {
-              (
-                customStartMarker as naver.maps.Marker & {
-                  setMap: (map: naver.maps.Map | null) => void;
-                }
-              ).setMap(null);
-            }
-            setCustomStart(coord);
-            const startMarker = new window.naver.maps.Marker({
-              position: new window.naver.maps.LatLng(item.lat, item.lng),
-              map: map,
-              title: `출발지: ${item.region}`,
-              icon: {
-                content: `<div style="
-                  background: #4CAF50;
-                  color: white;
-                  padding: 4px 8px;
-                  border-radius: 6px;
-                  font-size: 12px;
-                  font-weight: bold;
-                  border: 2px solid white;
-                  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-                ">🚀 출발지</div>`,
-                size: new window.naver.maps.Size(12, 12),
-                anchor: new window.naver.maps.Point(12, 12),
-              },
-            });
-            setCustomStartMarker(startMarker);
-
-            // 즉시 경로 그리기
-            drawCustomRoute(coord, goal);
-          } else {
-            // 도착지로 변경
-            if (customGoalMarker) {
-              (
-                customGoalMarker as naver.maps.Marker & {
-                  setMap: (map: naver.maps.Map | null) => void;
-                }
-              ).setMap(null);
-            }
-            setCustomGoal(coord);
-            const goalMarker = new window.naver.maps.Marker({
-              position: new window.naver.maps.LatLng(item.lat, item.lng),
-              map: map,
-              title: `도착지: ${item.region}`,
-              icon: {
-                content: `<div style="
-                  background: #F44336;
-                  color: white;
-                  padding: 4px 8px;
-                  border-radius: 6px;
-                  font-size: 12px;
-                  font-weight: bold;
-                  border: 2px solid white;
-                  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-                ">🎯 도착지</div>`,
-                size: new window.naver.maps.Size(12, 12),
-                anchor: new window.naver.maps.Point(12, 12),
-              },
-            });
-            setCustomGoalMarker(goalMarker);
-
-            // 즉시 경로 그리기
-            drawCustomRoute(start, coord);
-          }
-        }
-      });
-
-      markersRef.current.push(marker);
-    });
-
-    // 필터링된 cargoStations 표시
-    filteredCargoStations.forEach((station) => {
-      const marker = new window.naver.maps.Marker({
-        position: new window.naver.maps.LatLng(station.lat, station.lng),
-        map: map,
-        title: `${station.name} (${station.type})`,
-        icon: {
-          content: `<div style="
-    padding: 4px 6px;
-    background: ${getColorByCargoType(station.type)};
-    color: white;
-    font-size: 12px;
-    border-radius: 4px;
-    font-weight: bold;">
-    ${station.name}
-  </div>`,
-          anchor: new window.naver.maps.Point(10, 10),
-          size: new window.naver.maps.Size(20, 20),
-        },
-      });
-
-      // 🔥 cargoStations 마커 클릭 시 출발지/도착지 설정 (개선된 버전)
-      window.naver.maps.Event.addListener(marker, "click", () => {
-        const coord: [number, number] = [station.lat, station.lng];
-
-        const start = customStartRef.current;
-        const goal = customGoalRef.current;
-
-        if (!start && !goal) {
-          // 첫 번째 클릭: 출발지 설정
-          setCustomStart(coord);
-          const startMarker = new window.naver.maps.Marker({
-            position: new window.naver.maps.LatLng(station.lat, station.lng),
-            map: map,
-            title: `출발지: ${station.name}`,
-            icon: {
-              content: `<div style="
-                background: #4CAF50;
-                color: white;
-                padding: 4px 8px;
-                border-radius: 6px;
-                font-size: 12px;
-                font-weight: bold;
-                border: 2px solid white;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-              ">🚀 출발지</div>`,
-              size: new window.naver.maps.Size(12, 12),
-              anchor: new window.naver.maps.Point(12, 12),
-            },
-          });
-          setCustomStartMarker(startMarker);
-        } else if (start && !goal) {
-          // 두 번째 클릭: 도착지 설정 및 경로 그리기
-          setCustomGoal(coord);
-          const goalMarker = new window.naver.maps.Marker({
-            position: new window.naver.maps.LatLng(station.lat, station.lng),
-            map: map,
-            title: `도착지: ${station.name}`,
-            icon: {
-              content: `<div style="
-                background: #F44336;
-                color: white;
-                padding: 4px 8px;
-                border-radius: 6px;
-                font-size: 12px;
-                font-weight: bold;
-                border: 2px solid white;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-              ">🎯 도착지</div>`,
-              size: new window.naver.maps.Size(12, 12),
-              anchor: new window.naver.maps.Point(12, 12),
-            },
-          });
-          setCustomGoalMarker(goalMarker);
-
-          // 즉시 경로 그리기
-          drawCustomRoute(start, coord);
-        } else if (!start && goal) {
-          // 도착지만 있는 경우: 출발지 설정 및 경로 그리기
-          setCustomStart(coord);
-          const startMarker = new window.naver.maps.Marker({
-            position: new window.naver.maps.LatLng(station.lat, station.lng),
-            map: map,
-            title: `출발지: ${station.name}`,
-            icon: {
-              content: `<div style="
-                background: #4CAF50;
-                color: white;
-                padding: 4px 8px;
-                border-radius: 6px;
-                font-size: 12px;
-                font-weight: bold;
-                border: 2px solid white;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-              ">🚀 출발지</div>`,
-              size: new window.naver.maps.Size(12, 12),
-              anchor: new window.naver.maps.Point(12, 12),
-            },
-          });
-          setCustomStartMarker(startMarker);
-
-          // 즉시 경로 그리기
-          drawCustomRoute(coord, goal);
-        } else {
-          // 출발지와 도착지가 모두 있는 경우: 선택 옵션 제공
-          const isStart = window.confirm(
-            `"${station.name} (${station.type})"을(를) 어떻게 설정하시겠습니다?\n\n확인: 출발지로 변경\n취소: 도착지로 변경`
-          );
-
-          if (isStart) {
-            // 출발지로 변경
-            if (customStartMarker) {
-              (
-                customStartMarker as naver.maps.Marker & {
-                  setMap: (map: naver.maps.Map | null) => void;
-                }
-              ).setMap(null);
-            }
-            setCustomStart(coord);
-            const startMarker = new window.naver.maps.Marker({
-              position: new window.naver.maps.LatLng(station.lat, station.lng),
-              map: map,
-              title: `출발지: ${station.name}`,
-              icon: {
-                content: `<div style="
-                  background: #4CAF50;
-                  color: white;
-                  padding: 4px 8px;
-                  border-radius: 6px;
-                  font-size: 12px;
-                  font-weight: bold;
-                  border: 2px solid white;
-                  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-                ">🚀 출발지</div>`,
-                size: new window.naver.maps.Size(12, 12),
-                anchor: new window.naver.maps.Point(12, 12),
-              },
-            });
-            setCustomStartMarker(startMarker);
-
-            // 즉시 경로 그리기
-            drawCustomRoute(coord, goal);
-          } else {
-            // 도착지로 변경
-            if (customGoalMarker) {
-              (
-                customGoalMarker as naver.maps.Marker & {
-                  setMap: (map: naver.maps.Map | null) => void;
-                }
-              ).setMap(null);
-            }
-            setCustomGoal(coord);
-            const goalMarker = new window.naver.maps.Marker({
-              position: new window.naver.maps.LatLng(station.lat, station.lng),
-              map: map,
-              title: `도착지: ${station.name}`,
-              icon: {
-                content: `<div style="
-                  background: #F44336;
-                  color: white;
-                  padding: 4px 8px;
-                  border-radius: 6px;
-                  font-size: 12px;
-                  font-weight: bold;
-                  border: 2px solid white;
-                  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-                ">🎯 도착지</div>`,
-                size: new window.naver.maps.Size(12, 12),
-                anchor: new window.naver.maps.Point(12, 12),
-              },
-            });
-            setCustomGoalMarker(goalMarker);
-          }
-
-          // 경로 다시 그리기
-          if (highlightedRoute) highlightedRoute.setMap(null);
-          setHighlightedRoute(null);
-        }
-      });
-    });
-
-    // 역지오코딩 API - JS SDK 공식 방식
-    window.naver.maps.Event.addListener(
-      map,
-      "click",
-      (e: naver.maps.PointerEvent) => {
-        const latlng = e.coord;
-        window.naver.maps.Service.reverseGeocode(
-          {
-            coords: latlng,
-            orders: `${window.naver.maps.Service.OrderType.LEGAL_CODE},${window.naver.maps.Service.OrderType.ADDR}`,
-          },
-          (status, response) => {
-            if (status !== window.naver.maps.Service.Status.OK) return;
-            const result = response.v2.results[0];
-            if (result) {
-              const sido = result.region.area1.name;
-              const sigungu = result.region.area2.name;
-              const region = `${sido} ${sigungu}`;
-              onRegionClick?.(region);
-            }
-          }
-        );
-      }
-    );
-
-    // selectedIndustry가 있으면 자동으로 경로 표시
-    if (selectedIndustry) {
-      const industryToCategory: {
-        [key: string]: "container" | "cement" | "steel";
-      } = {
-        biotech: "container",
-        it: "container",
-        semiconductor: "container",
-        automotive: "steel",
-        machinery: "steel",
-        steel: "steel",
-        cement: "cement",
-      };
-
-      const category = industryToCategory[selectedIndustry];
-      if (category) {
-        setSelectedCategory(category);
-        // 지도 초기화 완료 후 경로 표시
-        setTimeout(() => {
-          handleShowCategoryRoutes(category);
-        }, 1000);
-      }
-    }
-  }, [data, onRegionClick, selectedIndustry]);
-  const loadRailwayData = useCallback(async () => {
-    setIsLoadingRailwayData(true);
-    try {
-      // 철도산업 사업현황
-      const industryResponse = await fetch(
-        "/vibe-cluster-insight-hub/railway_industry_info_utf8.csv"
-      );
-      const industryText = await industryResponse.text();
-      const industryData = parseCSV<RailwayIndustryInfo>(industryText);
-      setRailwayIndustryData(industryData);
-
-      // 고속철도 사업계획
-      const highSpeedResponse = await fetch(
-        "/vibe-cluster-insight-hub/high_speed_railway_plan_utf8.csv"
-      );
-      const highSpeedText = await highSpeedResponse.text();
-      const highSpeedData = parseCSV<HighSpeedRailwayPlan>(highSpeedText);
-      setHighSpeedRailwayData(highSpeedData);
-
-      // 광역철도 사업내용
-      const metropolitanResponse = await fetch(
-        "/vibe-cluster-insight-hub/metropolitan_railway_info_utf8.csv"
-      );
-      const metropolitanText = await metropolitanResponse.text();
-      const metropolitanData =
-        parseCSV<MetropolitanRailwayInfo>(metropolitanText);
-      setMetropolitanRailwayData(metropolitanData);
-
-      // 일반철도 공사내용
-      const generalResponse = await fetch(
-        "/vibe-cluster-insight-hub/general_railway_construction_utf8.csv"
-      );
-      const generalText = await generalResponse.text();
-      const generalData = parseCSV<GeneralRailwayConstruction>(generalText);
-      setGeneralRailwayData(generalData);
-
-      // 철도건설현황
-      const constructionResponse = await fetch(
-        "/vibe-cluster-insight-hub/railway_construction_status_utf8.csv"
-      );
-      const constructionText = await constructionResponse.text();
-      const constructionData =
-        parseCSV<RailwayConstructionStatus>(constructionText);
-      setRailwayConstructionData(constructionData);
-
-      console.log(
-        `철도 데이터 로드 완료: 산업현황 ${industryData.length}건, 고속철도 ${highSpeedData.length}건, 광역철도 ${metropolitanData.length}건, 일반철도 ${generalData.length}건, 건설현황 ${constructionData.length}건`
-      );
-    } catch (error) {
-      console.error("철도 데이터 로드 실패:", error);
-    } finally {
-      setIsLoadingRailwayData(false);
-    }
-  }, []);
   useEffect(() => {
     if (!mapRef.current) return;
 
@@ -1595,10 +176,10 @@ const MapHeatmap = ({
 
     script.onload = () => {
       initializeMap();
-      // 도로 공사정보 데이터 로드
+      // 데이터 로딩 함수들 호출
       loadRoadConstructionData();
-      // 철도 데이터 로드
       loadRailwayData();
+      loadAirportData();
     };
 
     return () => {
@@ -1606,7 +187,12 @@ const MapHeatmap = ({
         script.parentNode.removeChild(script);
       }
     };
-  }, [initializeMap, loadRoadConstructionData, loadRailwayData]);
+  }, [
+    initializeMap,
+    loadRoadConstructionData,
+    loadRailwayData,
+    loadAirportData,
+  ]);
 
   // selectedIndustry가 변경될 때 상세 경로 정보 초기화
   useEffect(() => {
@@ -1615,26 +201,23 @@ const MapHeatmap = ({
       setClickedRouteData(null);
       setCurrentRedRouteId(null);
       setRoutePolylines([]);
-      // ✨ 빨간색 경로도 초기화
+      // 빨간색 경로도 초기화
       if (highlightedRoute) {
         highlightedRoute.setMap(null);
         setHighlightedRoute(null);
       }
     }
-  }, [selectedIndustry, clickedRouteData, highlightedRoute]);
+  }, [
+    selectedIndustry,
+    clickedRouteData,
+    highlightedRoute,
+    setClickedRouteData,
+    setCurrentRedRouteId,
+    setRoutePolylines,
+    setHighlightedRoute,
+  ]);
 
-  // 🔥 selectedIndustry가 변경될 때 자동으로 인프라 필터링 적용
-  useEffect(() => {
-    if (selectedIndustry) {
-      // 업종별 인프라 필터링 적용
-      filterInfrastructureByIndustry(selectedIndustry);
-    } else {
-      // 필터링 해제
-      clearInfrastructureFilter();
-    }
-  }, [selectedIndustry]);
-
-  // 🔥 출발지와 도착지가 모두 설정되면 경로 요청
+  // 출발지와 도착지가 모두 설정되면 경로 요청
   useEffect(() => {
     if (
       !customStartRef.current ||
@@ -1655,7 +238,11 @@ const MapHeatmap = ({
       };
 
       try {
-        const result = await fetchRouteFromAPI(routeOption, {}, true);
+        const result = await fetchRouteFromAPI(
+          routeOption.start,
+          routeOption.goal,
+          routeOption.vias
+        );
         if (!result || !result.path || result.path.length < 2) {
           console.warn("유효하지 않은 경로 데이터:", result);
           return;
@@ -1669,8 +256,8 @@ const MapHeatmap = ({
         const newRoute = drawRouteFromAPI(
           mapInstance.current,
           result,
-          "#FF6B6B",
-          routeOption
+          routeOption.id, // routeId는 string이어야 함
+          "#FF6B6B"
         );
 
         if (newRoute) {
@@ -1682,262 +269,18 @@ const MapHeatmap = ({
     };
 
     fetchAndDrawRoute();
-  }, [customStart, customGoal]);
+  }, [customStart, customGoal, highlightedRoute, setHighlightedRoute]);
 
-  // 빨간색 경로 제거 함수 (비동기 처리)
-  const removeRedRoutesAsync = (): Promise<void> => {
-    return new Promise<void>((resolve) => {
-      console.log(
-        `빨간색 경로 제거 함수 실행: ${highlightedRoute ? "1개" : "0개"} 제거`
-      );
-
-      // 별도 관리되는 빨간색 경로 제거
-      if (highlightedRoute) {
-        highlightedRoute.setMap(null);
-        setHighlightedRoute(null);
-      }
-
-      // 기존 routePolylines에서도 빨간색 경로 제거 (안전장치)
-      const currentRedPolylines = routePolylines.filter(
-        (polyline) => polyline.getOptions().strokeColor === "#FF6B6B"
-      );
-
-      if (currentRedPolylines.length > 0) {
-        console.log(
-          `routePolylines에서 추가 빨간색 경로 ${currentRedPolylines.length}개 제거`
-        );
-        currentRedPolylines.forEach((polyline) => {
-          polyline.setMap(null);
-        });
-
-        setRoutePolylines((prev) => {
-          const filtered = prev.filter(
-            (polyline) => polyline.getOptions().strokeColor !== "#FF6B6B"
-          );
-          console.log(
-            `상태에서 빨간색 경로 제거 후 남은 경로: ${filtered.length}개`
-          );
-          return filtered;
-        });
-      }
-
-      setCurrentRedRouteId(null);
-      resolve();
-    });
-  };
-
-  // 경로 클릭 핸들러
-  const handleRouteClick = async (route: RouteOption, routeData: RouteData) => {
-    if (!mapInstance.current) return;
-
-    setIsLoadingRoute(true);
-
-    try {
-      // 기존 빨간색 경로 제거 완료 대기
-      await removeRedRoutesAsync();
-
-      // React 상태 업데이트가 완전히 반영되도록 약간의 지연
-      await new Promise((resolve) => setTimeout(resolve, 50));
-
-      // ✨ 중복 체크: 같은 경로를 다시 선택한 경우 처리
-      if (currentRedRouteId === route.id) {
-        console.log(`이미 강조된 경로입니다: ${route.id}`);
-        setIsLoadingRoute(false);
-        return;
-      }
-
-      // 전체 경로가 없다면 먼저 표시
-      const categoryPolylines = routePolylines.filter(
-        (polyline) => polyline.getOptions().strokeColor === "#9CA3AF"
-      );
-
-      if (categoryPolylines.length === 0) {
-        await handleShowCategoryRoutes(route.category);
-      }
-
-      // 클릭된 경로의 상세 데이터 가져오기
-      const detailedRouteData = await fetchRouteFromAPI(
-        route,
-        routeDataCache,
-        true
-      ); // 상세 API 사용
-
-      // 클릭된 경로 데이터 상태 업데이트 (즉시 업데이트하여 정보 유지)
-      setClickedRouteData({
-        route: route,
-        data: detailedRouteData,
-      });
-
-      // 빨간색으로 강조된 경로 그리기
-      const result = drawRouteFromAPI(
-        mapInstance.current,
-        detailedRouteData,
-        "#FF6B6B",
-        route,
-        undefined // ❌ 클릭 이벤트 콜백 제거 - 무한 루프 방지
-      ); // 빨간색, 클릭 불가능
-
-      if (result) {
-        // 새로운 빨간색 경로를 별도 상태로 관리
-        setHighlightedRoute(result);
-        setCurrentRedRouteId(route.id);
-
-        console.log(`새로운 빨간색 경로 설정 완료: ${route.id}`);
-        console.log(`highlightedRoute 상태:`, result);
-        console.log(`currentRedRouteId 상태:`, route.id);
-      } else {
-        console.error(`빨간색 경로 생성 실패: ${route.id}`);
-      }
-
-      // 경로의 경계를 계산하여 지도 뷰 조정
-      if (detailedRouteData.path && detailedRouteData.path.length > 0) {
-        console.log("경로가 성공적으로 그려졌습니다:", detailedRouteData.path);
-      }
-    } catch (error) {
-      console.error("경로 표시 실패:", error);
-    } finally {
-      setIsLoadingRoute(false);
+  // 🔥 selectedIndustry가 변경될 때 자동으로 인프라 필터링 적용
+  useEffect(() => {
+    if (selectedIndustry) {
+      // 업종별 인프라 필터링 적용
+      filterInfrastructureByIndustry(selectedIndustry);
+    } else {
+      // 필터링 해제
+      clearInfrastructureFilter();
     }
-  };
-
-  // 카테고리별 모든 경로 표시 (회색으로 기본 표시)
-  const handleShowCategoryRoutes = async (
-    category: "container" | "cement" | "steel"
-  ) => {
-    if (!mapInstance.current) return;
-
-    setIsLoadingRoute(true);
-
-    try {
-      // 기존 경로들을 지도에서 제거
-      routePolylines.forEach((polyline) => {
-        console.log("기존 경로 제거");
-        polyline.setMap(null);
-      });
-
-      // 상태 초기화 (상세 경로 정보는 유지)
-      setRoutePolylines([]);
-      setCurrentRedRouteId(null); // 현재 빨간색 경로 ID 초기화
-      // ✨ 빨간색 경로도 clickedRouteData가 없을 때만 초기화
-      if (!clickedRouteData && highlightedRoute) {
-        highlightedRoute.setMap(null);
-        setHighlightedRoute(null);
-      }
-
-      const categoryRoutes = routeCategories[category];
-      const newPolylines: RoutePolyline[] = [];
-      const newCache: { [key: string]: RouteData } = {};
-
-      // 카테고리의 모든 경로를 순차적으로 표시 (회색)
-      for (const route of categoryRoutes) {
-        const routeData = await fetchRouteFromAPI(route, routeDataCache, false); // Mock 데이터 사용
-
-        // 캐시에 저장
-        newCache[route.id] = routeData;
-
-        const result = drawRouteFromAPI(
-          mapInstance.current,
-          routeData,
-          "#9CA3AF",
-          route,
-          handleRouteClick
-        ); // 회색, 클릭 가능
-        if (result) {
-          newPolylines.push(result);
-        }
-      }
-
-      // 경로 상태 업데이트
-      setRoutePolylines(newPolylines);
-
-      // 초기 로드가 완료되면 캐시 상태 업데이트
-      if (isInitialLoad) {
-        setRouteDataCache(newCache);
-        setIsInitialLoad(false);
-      }
-
-      console.log(
-        `${category} 카테고리 경로 ${newPolylines.length}개 표시 완료`
-      );
-    } catch (error) {
-      console.error("경로 표시 실패:", error);
-    } finally {
-      setIsLoadingRoute(false);
-    }
-  };
-
-  // 단일 경로 표시 (기존 함수)
-  const handleShowRoute = async () => {
-    if (!mapInstance.current) return;
-
-    setIsLoadingRoute(true);
-
-    try {
-      // 기존 빨간색 경로 제거 완료 대기
-      await removeRedRoutesAsync();
-
-      // React 상태 업데이트가 완전히 반영되도록 약간의 지연
-      await new Promise((resolve) => setTimeout(resolve, 50));
-
-      // ✨ 중복 체크: 같은 경로를 다시 선택한 경우 처리
-      if (currentRedRouteId === selectedRoute.id) {
-        console.log(`이미 강조된 경로입니다: ${selectedRoute.id}`);
-        setIsLoadingRoute(false);
-        return;
-      }
-
-      // 전체 경로가 없다면 먼저 표시
-      const categoryPolylines = routePolylines.filter(
-        (polyline) => polyline.getOptions().strokeColor === "#9CA3AF"
-      );
-
-      if (categoryPolylines.length === 0) {
-        await handleShowCategoryRoutes(selectedRoute.category);
-      }
-
-      // 선택된 경로의 상세 데이터 가져오기
-      const detailedRouteData = await fetchRouteFromAPI(
-        selectedRoute,
-        routeDataCache,
-        true
-      ); // 상세 API 사용
-
-      // 선택된 경로 데이터 상태 업데이트
-      setClickedRouteData({
-        route: selectedRoute,
-        data: detailedRouteData,
-      });
-
-      const result = drawRouteFromAPI(
-        mapInstance.current,
-        detailedRouteData,
-        "#FF6B6B",
-        selectedRoute,
-        undefined // ❌ 클릭 이벤트 콜백 제거 - 무한 루프 방지
-      ); // 빨간색, 클릭 불가능
-
-      if (result) {
-        // 새로운 빨간색 경로를 별도 상태로 관리
-        setHighlightedRoute(result);
-        setCurrentRedRouteId(selectedRoute.id);
-
-        console.log(`새로운 빨간색 경로 설정 완료: ${selectedRoute.id}`);
-        console.log(`highlightedRoute 상태:`, result);
-        console.log(`currentRedRouteId 상태:`, selectedRoute.id);
-      } else {
-        console.error(`빨간색 경로 생성 실패: ${selectedRoute.id}`);
-      }
-
-      // 경로의 경계를 계산하여 지도 뷰 조정
-      if (detailedRouteData.path && detailedRouteData.path.length > 0) {
-        console.log("경로가 성공적으로 그려졌습니다:", detailedRouteData.path);
-      }
-    } catch (error) {
-      console.error("경로 표시 실패:", error);
-    } finally {
-      setIsLoadingRoute(false);
-    }
-  };
+  }, [selectedIndustry]);
 
   // 🔥 업종별 인프라 필터링 함수들
   const getIndustryInfo = useCallback((industry: string) => {
@@ -2072,38 +415,6 @@ const MapHeatmap = ({
       }
     });
   }, []);
-
-  // 🔥 경로 초기화 함수
-  const resetCustomRoute = useCallback(() => {
-    // 기존 마커들 제거
-    if (customStartMarker) {
-      (
-        customStartMarker as naver.maps.Marker & {
-          setMap: (map: naver.maps.Map | null) => void;
-        }
-      ).setMap(null);
-    }
-    if (customGoalMarker) {
-      (
-        customGoalMarker as naver.maps.Marker & {
-          setMap: (map: naver.maps.Map | null) => void;
-        }
-      ).setMap(null);
-    }
-    if (highlightedRoute) {
-      highlightedRoute.setMap(null);
-    }
-
-    // 상태 초기화
-    setCustomStart(null);
-    setCustomGoal(null);
-    setCustomStartMarker(null);
-    setCustomGoalMarker(null);
-    setHighlightedRoute(null);
-    setClickedRouteData(null); // 상세 경로 정보도 초기화
-  }, [customStartMarker, customGoalMarker, highlightedRoute]);
-
-  // 🔥 도로 공사정보 데이터 로드 함수
 
   // 🔥 도로 인프라 연계성 분석 함수
   const analyzeRoadInfrastructure = useCallback(
@@ -2841,11 +1152,6 @@ const MapHeatmap = ({
       if (!mapInstance.current) return;
 
       console.log("철도 마커 표시 시작");
-      console.log("철도산업 데이터:", railwayIndustryData.length);
-      console.log("고속철도 데이터:", highSpeedRailwayData.length);
-      console.log("광역철도 데이터:", metropolitanRailwayData.length);
-      console.log("일반철도 데이터:", generalRailwayData.length);
-      console.log("철도건설 데이터:", railwayConstructionData.length);
 
       // 기존 철도 마커 제거
       const existingMarkers = markersRef.current.filter((marker) => {
@@ -2858,162 +1164,164 @@ const MapHeatmap = ({
         (marker as ExtendedMarker).setMap(null)
       );
 
-      // 철도 마커 추가
-      const addRailwayMarker = (
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        data: any,
-        title: string,
-        type: string,
-        color: string
-      ) => {
-        // 데이터의 모든 키를 확인
-        console.log(`데이터 키 확인 - ${type}:`, Object.keys(data));
-        console.log(`데이터 값 확인 - ${type}:`, data);
+      // 지역별로 철도 데이터 그룹화
+      const regionGroups: {
+        [key: string]: Array<{
+          data:
+            | RailwayIndustryInfo
+            | HighSpeedRailwayPlan
+            | MetropolitanRailwayInfo
+            | GeneralRailwayConstruction
+            | RailwayConstructionStatus;
+          type: string;
+          color: string;
+        }>;
+      } = {};
 
-        // 실제 데이터의 필드명 사용 (한글 인코딩 문제 고려)
-        const businessName =
-          data.사업명 || data["사업명"] || Object.values(data)[1] || "";
-        const routeName = data.노선명 || data["노선명"] || "";
-
-        // title이 undefined인 경우 businessName 사용
-        const markerTitle = title || businessName || type;
-
-        console.log(`필드 추출 결과 - ${type}:`, {
-          businessName,
-          routeName,
-          markerTitle,
-          rawData: data,
-        });
-
-        if (!businessName && !routeName) {
-          console.log("사업명과 노선명이 없음:", data);
-          return;
-        }
-
-        // 주소에서 좌표 추출 (간단한 매핑)
-        const address = businessName || routeName || "";
-        console.log(`마커 생성 시도 - ${type}:`, {
-          markerTitle,
-          address,
-          businessName,
-          routeName,
-        });
-
+      // 철도산업 사업현황 데이터 그룹화
+      railwayIndustryData.forEach((item) => {
+        const address = item.사업명 || "";
         const coordinates = extractCoordinatesFromAddress(address);
-        console.log(`좌표 추출 결과 - ${type}:`, coordinates);
-
-        if (!coordinates) {
-          console.log(`좌표 추출 실패 - ${type}:`, address);
-          return;
+        if (coordinates) {
+          const coordKey = `${coordinates.lat.toFixed(
+            4
+          )},${coordinates.lng.toFixed(4)}`;
+          if (!regionGroups[coordKey]) {
+            regionGroups[coordKey] = [];
+          }
+          regionGroups[coordKey].push({
+            data: item,
+            type: "철도산업",
+            color: "#FF8C42",
+          });
         }
+      });
+
+      // 고속철도 데이터 그룹화
+      highSpeedRailwayData.forEach((item) => {
+        const address = item.사업명 || "";
+        const coordinates = extractCoordinatesFromAddress(address);
+        if (coordinates) {
+          const coordKey = `${coordinates.lat.toFixed(
+            4
+          )},${coordinates.lng.toFixed(4)}`;
+          if (!regionGroups[coordKey]) {
+            regionGroups[coordKey] = [];
+          }
+          regionGroups[coordKey].push({
+            data: item,
+            type: "고속철도",
+            color: "#FF6B6B",
+          });
+        }
+      });
+
+      // 광역철도 데이터 그룹화
+      metropolitanRailwayData.forEach((item) => {
+        const address = item.사업명 || "";
+        const coordinates = extractCoordinatesFromAddress(address);
+        if (coordinates) {
+          const coordKey = `${coordinates.lat.toFixed(
+            4
+          )},${coordinates.lng.toFixed(4)}`;
+          if (!regionGroups[coordKey]) {
+            regionGroups[coordKey] = [];
+          }
+          regionGroups[coordKey].push({
+            data: item,
+            type: "광역철도",
+            color: "#4ECDC4",
+          });
+        }
+      });
+
+      // 일반철도 데이터 그룹화
+      generalRailwayData.forEach((item) => {
+        const address = item.노선명 || "";
+        const coordinates = extractCoordinatesFromAddress(address);
+        if (coordinates) {
+          const coordKey = `${coordinates.lat.toFixed(
+            4
+          )},${coordinates.lng.toFixed(4)}`;
+          if (!regionGroups[coordKey]) {
+            regionGroups[coordKey] = [];
+          }
+          regionGroups[coordKey].push({
+            data: item,
+            type: "일반철도",
+            color: "#45B7D1",
+          });
+        }
+      });
+
+      // 철도건설현황 데이터 그룹화
+      railwayConstructionData.forEach((item) => {
+        const address = item.사업명 || "";
+        const coordinates = extractCoordinatesFromAddress(address);
+        if (coordinates) {
+          const coordKey = `${coordinates.lat.toFixed(
+            4
+          )},${coordinates.lng.toFixed(4)}`;
+          if (!regionGroups[coordKey]) {
+            regionGroups[coordKey] = [];
+          }
+          regionGroups[coordKey].push({
+            data: item,
+            type: "철도건설",
+            color: "#96CEB4",
+          });
+        }
+      });
+
+      // 지역별로 하나의 마커만 생성
+      Object.entries(regionGroups).forEach(([coordKey, items]) => {
+        const [lat, lng] = coordKey.split(",").map(Number);
+        const firstItem = items[0];
 
         const marker = new window.naver.maps.Marker({
-          position: new window.naver.maps.LatLng(
-            coordinates.lat,
-            coordinates.lng
-          ),
+          position: new window.naver.maps.LatLng(lat, lng),
           map: mapInstance.current,
-          title: `철도: ${markerTitle}`,
+          title: `철도: ${items.length}개 사업`,
           icon: {
             content: `<div style="
-              background: ${color};
+              background: ${items.length > 1 ? "#FF8C42" : firstItem.color};
               color: white;
-              padding: 4px 8px;
-              border-radius: 4px;
-              font-size: 10px;
+              padding: 6px 8px;
+              border-radius: 6px;
+              font-size: 11px;
               font-weight: bold;
-              white-space: nowrap;
               border: 2px solid white;
               box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-            ">🚄 ${type}</div>`,
-            size: new window.naver.maps.Size(50, 20),
-            anchor: new window.naver.maps.Point(25, 10),
+              max-width: 150px;
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+            ">🚄 ${
+              items.length > 1
+                ? `${items.length}개 사업`
+                : ("사업명" in firstItem.data
+                    ? firstItem.data.사업명?.substring(0, 20)
+                    : "") ||
+                  ("노선명" in firstItem.data
+                    ? firstItem.data.노선명?.substring(0, 20)
+                    : "") ||
+                  firstItem.type
+            }...</div>`,
+            size: new window.naver.maps.Size(150, 30),
+            anchor: new window.naver.maps.Point(75, 15),
           },
         });
 
-        console.log(`마커 생성 성공 - ${type}:`, {
-          markerTitle,
-          coordinates,
-          color,
-          marker: marker,
-        });
-
-        // 마커 클릭 이벤트
+        // 마커 클릭 이벤트 - 지역별 모든 철도 정보 표시
         window.naver.maps.Event.addListener(marker, "click", () => {
-          const infoWindow = new window.naver.maps.InfoWindow({
-            content: `
-              <div style="padding: 10px; max-width: 300px;">
-                <h3 style="margin: 0 0 8px 0; color: #2563eb;">🚄 ${type}</h3>
-                <p style="margin: 4px 0;"><strong>사업명:</strong> ${
-                  businessName || "정보 없음"
-                }</p>
-                <p style="margin: 4px 0;"><strong>노선명:</strong> ${
-                  routeName || "정보 없음"
-                }</p>
-                <p style="margin: 4px 0;"><strong>완료일:</strong> ${
-                  data.사업완료일 ||
-                  data["사업완료일(예정일)"] ||
-                  Object.values(data)[2] ||
-                  "정보 없음"
-                }</p>
-                <p style="margin: 4px 0;"><strong>투자금액:</strong> ${
-                  data.투자금액 ||
-                  data["투자금액"] ||
-                  Object.values(data)[3] ||
-                  "정보 없음"
-                }</p>
-              </div>
-            `,
-            maxWidth: 350,
-            backgroundColor: "#ffffff",
-            borderColor: "#2563eb",
-            borderWidth: 2,
-            anchorSize: new window.naver.maps.Size(10, 10),
-            anchorColor: "#ffffff",
-            pixelOffset: new window.naver.maps.Point(0, -10),
-          });
-
-          infoWindow.open(mapInstance.current, marker);
+          if (items.length > 1) {
+            showRegionalRailwayInfo(items);
+          } else {
+            showRailwayInfo(firstItem.data, firstItem.type);
+          }
         });
 
         markersRef.current.push(marker);
-        console.log(`마커 추가 완료 - ${type}:`, markerTitle);
-
-        // 마커가 실제로 지도에 추가되었는지 확인
-        setTimeout(() => {
-          const markerPosition = (marker as ExtendedMarker).getPosition();
-          console.log(`마커 위치 확인 - ${type}:`, {
-            markerTitle,
-            position: markerPosition,
-            isOnMap:
-              (marker as ExtendedMarker).getMap() === mapInstance.current,
-          });
-        }, 100);
-      };
-
-      // 철도산업 사업현황 마커 추가
-      railwayIndustryData.forEach((item) => {
-        addRailwayMarker(item, item.사업명, "철도산업", "#FF8C42");
-      });
-
-      // 고속철도 마커 추가
-      highSpeedRailwayData.forEach((item) => {
-        addRailwayMarker(item, item.사업명, "고속철도", "#FF6B6B");
-      });
-
-      // 광역철도 마커 추가
-      metropolitanRailwayData.forEach((item) => {
-        addRailwayMarker(item, item.사업명, "광역철도", "#4ECDC4");
-      });
-
-      // 일반철도 마커 추가
-      generalRailwayData.forEach((item) => {
-        addRailwayMarker(item, item.노선명, "일반철도", "#45B7D1");
-      });
-
-      // 철도건설현황 마커 추가
-      railwayConstructionData.forEach((item) => {
-        addRailwayMarker(item, item.사업명, "철도건설", "#96CEB4");
       });
 
       console.log("철도 마커 표시 완료");
@@ -3095,6 +1403,101 @@ const MapHeatmap = ({
         mapInstance.current,
         new window.naver.maps.LatLng(coordinates.lat, coordinates.lng)
       );
+    }
+  };
+
+  // 🔥 지역별 여러 철도 정보 표시 함수
+  const showRegionalRailwayInfo = (
+    items: Array<{
+      data:
+        | RailwayIndustryInfo
+        | HighSpeedRailwayPlan
+        | MetropolitanRailwayInfo
+        | GeneralRailwayConstruction
+        | RailwayConstructionStatus;
+      type: string;
+      color: string;
+    }>
+  ) => {
+    const itemsHtml = items
+      .map(
+        (item, index) => `
+    <div style="border-bottom: 1px solid #eee; padding: 10px 0; ${
+      index === items.length - 1 ? "border-bottom: none;" : ""
+    }">
+      <h4 style="margin: 0 0 8px 0; color: #333; font-size: 13px;">${
+        ("사업명" in item.data ? item.data.사업명 : "") ||
+        ("노선명" in item.data ? item.data.노선명 : "") ||
+        item.type
+      }</h4>
+      <div style="font-size: 11px; line-height: 1.3; color: #666;">
+        <p><strong>유형:</strong> ${item.type}</p>
+        <p><strong>사업구간:</strong> ${
+          ("사업구간" in item.data ? item.data.사업구간 : "") || "정보 없음"
+        }</p>
+        <p><strong>사업내용:</strong> ${
+          ("사업내용" in item.data ? item.data.사업내용 : "") || "정보 없음"
+        }</p>
+        <p><strong>연장:</strong> ${
+          ("연장" in item.data ? item.data.연장 : "") || "정보 없음"
+        }</p>
+        <p><strong>추진단계:</strong> ${
+          ("추진단계" in item.data ? item.data.추진단계 : "") ||
+          ("진행률" in item.data ? item.data.진행률 : "") ||
+          "정보 없음"
+        }</p>
+      </div>
+    </div>
+  `
+      )
+      .join("");
+
+    const infoWindow = new window.naver.maps.InfoWindow({
+      content: `
+        <div style="padding: 15px; max-width: 350px; max-height: 400px; overflow-y: auto; position: relative;">
+          <button id="closeRegionalRailwayBtn" 
+                  style="position: absolute; top: 5px; right: 5px; background: #FF8C42; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; z-index: 1000;">
+            ×
+          </button>
+          <h3 style="margin: 0 0 15px 0; color: #333; font-size: 15px; border-bottom: 2px solid #FF8C42; padding-bottom: 8px; padding-right: 25px;">
+             철도 인프라 현황 (${items.length}개)
+          </h3>
+          <div style="font-size: 12px;">
+            ${itemsHtml}
+          </div>
+        </div>
+      `,
+      maxWidth: 400,
+      backgroundColor: "#fff",
+      borderColor: "#FF8C42",
+      borderWidth: 2,
+      anchorSize: new window.naver.maps.Size(20, 20),
+      anchorColor: "#fff",
+      pixelOffset: new window.naver.maps.Point(0, -10),
+    });
+
+    // 마커 위치에 정보창 표시
+    const coordinates = extractCoordinatesFromAddress(
+      ("사업구간" in items[0].data ? items[0].data.사업구간 : "") ||
+        ("사업명" in items[0].data ? items[0].data.사업명 : "") ||
+        ("노선명" in items[0].data ? items[0].data.노선명 : "") ||
+        ""
+    );
+    if (coordinates && mapInstance.current) {
+      infoWindow.open(
+        mapInstance.current,
+        new window.naver.maps.LatLng(coordinates.lat, coordinates.lng)
+      );
+
+      // 닫기 버튼 이벤트 리스너 추가
+      setTimeout(() => {
+        const closeBtn = document.getElementById("closeRegionalRailwayBtn");
+        if (closeBtn) {
+          closeBtn.addEventListener("click", () => {
+            infoWindow.close();
+          });
+        }
+      }, 100);
     }
   };
 
@@ -3356,9 +1759,9 @@ const MapHeatmap = ({
             </div>
           )}
 
-          {/* 🔥 철도 인프라 분석 결과 오버레이 */}
+          {/* 🔥 철도 인프라 분석 결과 오버레이 - 위치 변경 */}
           {showRailwayAnalysis && railwayAnalysisResult && (
-            <div className="absolute top-4 left-4 bg-white p-4 rounded-lg shadow-lg max-w-md border border-blue-200 max-h-96 overflow-y-auto z-20">
+            <div className="absolute top-4 right-4 bg-white p-4 rounded-lg shadow-lg max-w-md border border-blue-200 max-h-96 overflow-y-auto z-20">
               <h4 className="font-semibold text-sm mb-3 text-blue-800 flex items-center">
                 🚄 철도 인프라 연계성 분석
                 <Button
@@ -3439,9 +1842,79 @@ const MapHeatmap = ({
             </div>
           )}
 
-          {/* 🔥 업종별 인프라 정보 오버레이 */}
-          {currentIndustryInfo && (
+          {/* 🔥 업종별 인프라 정보 오버레이 - 위치 조정 */}
+          {currentIndustryInfo && !showRoadAnalysis && !showRailwayAnalysis && (
             <div className="absolute top-4 left-4 bg-white p-4 rounded-lg shadow-lg max-w-sm border border-blue-200">
+              <h4 className="font-semibold text-sm mb-3 text-blue-800 flex items-center">
+                🏭 {currentIndustryInfo.label} 인프라 현황
+              </h4>
+              <div className="space-y-2">
+                <div className="text-xs text-gray-600 mb-2">
+                  필요한 인프라 유형:{" "}
+                  {currentIndustryInfo.requiredInfrastructure.length}개
+                </div>
+                <div className="space-y-1">
+                  {currentIndustryInfo.locations.map((location, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between text-xs"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <div
+                          className="w-2 h-2 rounded-full"
+                          style={{
+                            backgroundColor: (() => {
+                              switch (location.type) {
+                                case "시멘트":
+                                  return "#6B7280";
+                                case "컨테이너":
+                                  return "#3B82F6";
+                                case "석탄":
+                                  return "#1F2937";
+                                case "철강":
+                                  return "#EF4444";
+                                case "유류":
+                                  return "#F59E0B";
+                                case "광석":
+                                  return "#10B981";
+                                case "공항":
+                                  return "#8B5CF6";
+                                case "항만":
+                                  return "#06B6D4";
+                                case "철도":
+                                  return "#F97316";
+                                default:
+                                  return "#9CA3AF";
+                              }
+                            })(),
+                          }}
+                        />
+                        <span className="font-medium">{location.name}</span>
+                      </div>
+                      <Badge variant="outline" className="text-xs">
+                        {location.type === "공항" && "✈️"}
+                        {location.type === "철도" && "🚂"}
+                        {location.type === "컨테이너" && "🚢"}
+                        {location.type === "항만" && "⚓"}
+                        {location.type === "시멘트" && "🧱"}
+                        {location.type === "철강" && "🏗️"}
+                        {location.type}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 pt-2 border-t border-gray-200">
+                  <div className="text-xs text-gray-500">
+                    💡 해당 업종에 필요한 물류 인프라가 모두 표시됩니다.
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 🔥 업종별 인프라 정보 오버레이 - 분석 결과가 있을 때는 다른 위치 */}
+          {currentIndustryInfo && (showRoadAnalysis || showRailwayAnalysis) && (
+            <div className="absolute bottom-4 left-4 bg-white p-4 rounded-lg shadow-lg max-w-sm border border-blue-200">
               <h4 className="font-semibold text-sm mb-3 text-blue-800 flex items-center">
                 🏭 {currentIndustryInfo.label} 인프라 현황
               </h4>
